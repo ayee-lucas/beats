@@ -1,0 +1,11 @@
+version: v2
+# 'clean', when set to true, deletes the directories, zip files, and/or jar files specified in the
+# `out` field for all plugins before running code generation.
+clean: true
+
+plugins:
+  - remote: buf.build/community/neoeinstein-prost:v0.5.0
+    out: crates/proto-gen/gen
+  - remote: buf.build/community/neoeinstein-tonic:v0.5.0
+    out: crates/proto-gen/gen
+

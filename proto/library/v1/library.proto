@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package library.v1;
+
+service LibraryService {
+    rpc GetHealth(GetHealthRequest) returns (GetHealthResponse);
+}
+
+message GetHealthRequest {
+    string name = 1;
+}
+
+// Invoice is a collection of goods or services sold to a customer.
+message GetHealthResponse {
+  string status = 1;
+}
+

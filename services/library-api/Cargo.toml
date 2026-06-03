@@ -13,4 +13,7 @@ name = "library-client"
 path = "src/client.rs"
 
 [dependencies]
+proto-gen = { path = "../../crates/proto-gen" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tonic = { version = "*", features = ["transport"] }
+async-trait = "0.1"

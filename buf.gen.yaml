@@ -4,8 +4,23 @@ version: v2
 clean: true
 
 plugins:
-  - remote: buf.build/community/neoeinstein-prost:v0.5.0
-    out: crates/proto-gen/gen
-  - remote: buf.build/community/neoeinstein-tonic:v0.5.0
-    out: crates/proto-gen/gen
+  # Message types + views (buffa). Requires protoc-gen-buffa on PATH.
+  - local: protoc-gen-buffa
+    out: crates/proto-gen/gen/buffa
+    opt:
+      - views=true
+      - json=true
+  - local: protoc-gen-buffa-packaging
+    out: crates/proto-gen/gen/buffa
+    strategy: all
 
+  # Service traits + register (connect-rust). Requires protoc-gen-connect-rust on PATH.
+  - local: protoc-gen-connect-rust
+    out: crates/proto-gen/gen/connect
+    opt:
+      - extern_path=.=::proto_gen::proto
+  - local: protoc-gen-buffa-packaging
+    out: crates/proto-gen/gen/connect
+    strategy: all
+    opt:
+      - filter=services

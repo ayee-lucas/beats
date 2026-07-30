@@ -1,4 +1,6 @@
-#[path = "../gen/library/v1/library.v1.rs"]
-mod library_proto_gen;
+extern crate self as proto_gen;
 
-pub use library_proto_gen::*;
+#[path = "../gen/buffa/mod.rs"]
+pub mod proto;
+#[path = "../gen/connect/mod.rs"]
+pub mod connect;

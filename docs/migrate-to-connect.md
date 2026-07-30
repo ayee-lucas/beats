@@ -34,21 +34,21 @@ Use cases and domain code are unchanged when switching hosting; only `server.rs`
 
 Requires [Buf](https://buf.build/docs/installation) (already used).
 
-- [ ] Install **`protoc-gen-buffa`** and **`protoc-gen-buffa-packaging`** — [buffa](https://github.com/anthropics/buffa) releases or `cargo install`.
-- [ ] Install **`protoc-gen-connect-rust`** — [GitHub release](https://github.com/anthropics/connect-rust/releases) or `cargo install --locked connectrpc-codegen`.
+- [x] Install **`protoc-gen-buffa`** and **`protoc-gen-buffa-packaging`** — [buffa](https://github.com/anthropics/buffa) releases or `cargo install`.
+- [x] Install **`protoc-gen-connect-rust`** — [GitHub release](https://github.com/anthropics/connect-rust/releases) or `cargo install --locked connectrpc-codegen`.
 
 ---
 
 ## 2. Switch `buf.gen.yaml`
 
-Today: `neoeinstein-prost` + `neoeinstein-tonic` → `crates/proto-gen/gen`.
+Was: `neoeinstein-prost` + `neoeinstein-tonic` → `crates/proto-gen/gen`.
 
-- [ ] Remove **neoeinstein-prost** and **neoeinstein-tonic** plugins.
-- [ ] Add **buffa** plugin → e.g. `crates/proto-gen/gen/buffa` with `opt: [views=true, json=true]`.
-- [ ] Add **buffa-packaging** on buffa out with `strategy: all`.
-- [ ] Add **protoc-gen-connect-rust** → e.g. `crates/proto-gen/gen/connect` with `opt: [extern_path=.=::proto_gen::proto]` (must match `pub mod proto` in `proto-gen/src/lib.rs`).
-- [ ] Add second **buffa-packaging** on connect out with `strategy: all` and `opt: [filter=services]`.
-- [ ] Run `make proto` / `buf generate` and fix any proto lint issues.
+- [x] Remove **neoeinstein-prost** and **neoeinstein-tonic** plugins.
+- [x] Add **buffa** plugin → e.g. `crates/proto-gen/gen/buffa` with `opt: [views=true, json=true]`.
+- [x] Add **buffa-packaging** on buffa out with `strategy: all`.
+- [x] Add **protoc-gen-connect-rust** → e.g. `crates/proto-gen/gen/connect` with `opt: [extern_path=.=::proto_gen::proto]` (must match `pub mod proto` in `proto-gen/src/lib.rs`).
+- [x] Add second **buffa-packaging** on connect out with `strategy: all` and `opt: [filter=services]`.
+- [x] Run `make proto` / `buf generate` and fix any proto lint issues.
 
 Example shape (adjust paths/options to match your `lib.rs` mount):
 
@@ -75,8 +75,8 @@ Use `extern_path=.=::proto_gen::proto` (leading `::` on the Rust path) so connec
 
 ## 3. Rework `crates/proto-gen`
 
-- [ ] Replace checked-in **`gen/library/v1/library.v1.rs`** and **`library.v1.tonic.rs`** with buffa + connect trees under `gen/buffa` and `gen/connect`.
-- [ ] Update **`src/lib.rs`** to expose modules, for example:
+- [x] Replace checked-in **`gen/library/v1/library.v1.rs`** and **`library.v1.tonic.rs`** with buffa + connect trees under `gen/buffa` and `gen/connect`.
+- [x] Update **`src/lib.rs`** to expose modules, for example:
 
   ```rust
   #[path = "../gen/buffa/mod.rs"]
@@ -85,14 +85,21 @@ Use `extern_path=.=::proto_gen::proto` (leading `::` on the Rust path) so connec
   pub mod connect;
   ```
 
-- [ ] Update **`Cargo.toml`**: remove `tonic`, `tonic-prost`, `prost`; add connect-rust generated deps (`connectrpc`, `buffa`, `buffa-types`, `serde`, `serde_json`, `http-body` — see [connect-rust README](https://github.com/anthropics/connect-rust#generated-code-dependencies)).
-- [ ] Add crate-root allows if the compiler requires them:
+  Keep the public module names as `proto` and `connect`. This is a crate-local module mount, and
+  the generated Connect code expects paths like `::proto_gen::proto::...`.
+
+- [x] Update **`Cargo.toml`**: remove `tonic`, `tonic-prost`, `prost`; add connect-rust generated deps (`connectrpc`, `buffa`, `buffa-types`, `serde`, `serde_json`, `http-body` — see [connect-rust README](https://github.com/anthropics/connect-rust#generated-code-dependencies)).
+- [x] Add crate-root allows if the compiler requires them:
 
   ```rust
   #![allow(refining_impl_trait_internal, refining_impl_trait_reachable)]
   ```
 
-- [ ] `cargo build -p proto-gen` and commit regenerated `gen/`.
+- [x] `cargo build -p proto-gen` and commit regenerated `gen/`.
+
+**Checkpoint:** finish this section before touching runtime wiring. If `src/lib.rs` still points at
+deleted Tonic outputs (`gen/library/v1/...`), downstream code will show unresolved imports even if
+`server.rs` itself has not been migrated yet.
 
 ---
 
@@ -114,6 +121,10 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
 ```
 
 - [ ] `cargo build -p library-api` (adapter/server will fail until steps 5–6).
+
+**Order note:** keep Tonic-only code paths until steps 5–6 are ready in the same branch. Removing
+`tonic` from `Cargo.toml` before replacing `server.rs` and the adapter leaves an expected but noisy
+half-migrated state with unresolved imports in `server.rs` and `adapters/grpc/`.
 
 ---
 
@@ -253,8 +264,8 @@ After the code migration (or in the same PR):
 
 ## Suggested PR order
 
-1. **Codegen only** — `buf.gen.yaml`, `proto-gen`, committed `gen/` (library-api may not build until PR 2).
-2. **Runtime** — adapter, Axum `server.rs`, `Cargo.toml`, `/health` + RPC curl smoke tests.
+1. **Codegen only** — `buf.gen.yaml`, `proto-gen/src/lib.rs`, `proto-gen/Cargo.toml`, committed `gen/`, and `cargo build -p proto-gen`.
+2. **Runtime** — adapter, Axum `server.rs`, `library-api/Cargo.toml`, retire Tonic-only imports/usages, then `/health` + RPC curl smoke tests.
 3. **Docs** — architecture + layering docs; client when implemented.
 
 ---

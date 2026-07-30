@@ -107,24 +107,26 @@ deleted Tonic outputs (`gen/library/v1/...`), downstream code will show unresolv
 
 **`services/library-api/Cargo.toml`:**
 
-- [ ] Remove **`tonic`** and **`async-trait`** (if only used for the gRPC adapter).
-- [ ] Add **`connectrpc`** with `features = ["axum"]` (Axum integration for `into_axum_service` / `into_axum_router`).
-- [ ] Add **`axum`** and **`tokio`** with `net` (for `TcpListener` + `axum::serve`).
-- [ ] Keep **`proto-gen`** path dependency.
+- [x] Remove **`tonic`**.
+- [x] Keep **`async-trait`** for now; it is still used by `SongRepository` and related `Arc<dyn ...>` wiring, so it is **not** gRPC-adapter-only today.
+- [x] Add **`connectrpc`** with `features = ["axum"]` (Axum integration for `into_axum_service` / `into_axum_router`).
+- [x] Add **`axum`** and **`tokio`** with `net` (for `TcpListener` + `axum::serve`).
+- [x] Keep **`proto-gen`** path dependency.
 
 Example:
 
 ```toml
-connectrpc = { version = "0.6", features = ["axum"] }
+connectrpc = { version = "0.8.1", features = ["axum"] }
 axum = "0.8"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+async-trait = "0.1"
 ```
 
-- [ ] `cargo build -p library-api` (adapter/server will fail until steps 5–6).
+- [x] `cargo build -p library-api` (currently passes with a stubbed `server.rs`; runtime behavior still depends on steps 5–6).
 
-**Order note:** keep Tonic-only code paths until steps 5–6 are ready in the same branch. Removing
-`tonic` from `Cargo.toml` before replacing `server.rs` and the adapter leaves an expected but noisy
-half-migrated state with unresolved imports in `server.rs` and `adapters/grpc/`.
+**Current state:** `library-api` now builds without Tonic. `server.rs` is intentionally a temporary
+stub and does not start any listener yet; the next work is to replace the old `grpc` adapter with a
+Connect adapter and then mount it on Axum.
 
 ---
 
@@ -132,8 +134,10 @@ half-migrated state with unresolved imports in `server.rs` and `adapters/grpc/`.
 
 Largest application change. **Do not** hand-write `trait LibraryService` — implement the **generated** Connect trait from `proto_gen::connect::…`.
 
-- [ ] Add module e.g. **`src/adapters/connect/`** (rename from `grpc/` or keep name and swap implementation).
-- [ ] Replace **`GrpcLibraryService`** Tonic impl with Connect impl:
+- [ ] Add module **`src/adapters/connect/`** and move the service adapter there.
+- [ ] Rename **`GrpcLibraryService`** to **`ConnectLibraryService`**.
+- [ ] Implement the generated trait from `proto_gen::connect::library::v1::...`, not a handwritten service trait.
+- [ ] Port the existing health logic from the Tonic adapter to Connect request/response types:
 
   | Tonic (today) | Connect |
   |---------------|---------|
@@ -141,10 +145,18 @@ Largest application change. **Do not** hand-write `trait LibraryService` — imp
   | `Result<tonic::Response<…>, tonic::Status>` | `ServiceResult<GetHealthResponse>` / `Response::ok(…)` |
   | `map_ping_error` → `tonic::Status` | `ConnectError` + `ErrorCode` (e.g. `Unavailable`) |
 
-- [ ] Update **`src/adapters/mod.rs`** exports.
+- [ ] Recreate `map_ping_error` in Connect terms (`ConnectError`, `ErrorCode::Unavailable`).
+- [ ] Update **`src/adapters/mod.rs`** to export `connect` instead of `grpc`.
+- [ ] Delete or retire the old **`src/adapters/grpc/`** module once the Connect adapter is in place.
 - [ ] **Do not** import `connectrpc` / `proto_gen` in **`domain/`** or **`application/`** — only the adapter and binaries.
 
-Reference: current adapter at `services/library-api/src/adapters/grpc/library_service.rs`.
+**Implementation note:** keep the adapter thin. It should only translate:
+
+- generated request types → application inputs
+- domain/application errors → Connect transport errors
+- application results → generated response types
+
+Reference: previous Tonic adapter logic lives at `services/library-api/src/adapters/grpc/library_service.rs`.
 
 ---
 
@@ -152,8 +164,12 @@ Reference: current adapter at `services/library-api/src/adapters/grpc/library_se
 
 **`services/library-api/src/server.rs`:**
 
+- [x] Remove Tonic server wiring. The file is currently a compile-only stub and no longer starts a server.
 - [ ] Keep wiring: `NoopSongRepository` → `GetHealthHandler` → adapter `Arc`.
-- [ ] Remove `LibraryServiceServer::new` and `tonic::transport::Server`.
+- [ ] Replace `GrpcLibraryService` usage with `ConnectLibraryService`.
+- [ ] Build a `connectrpc::Router`, register the service on it, and mount it into Axum.
+- [ ] Add a simple `GET /health` route on the Axum router.
+- [ ] Bind a Tokio `TcpListener` on an HTTP port (for example `[::1]:8080`) and serve the Axum app.
 - [ ] Register the Connect service and mount it on Axum:
 
   ```rust
@@ -193,7 +209,7 @@ Reference: current adapter at `services/library-api/src/adapters/grpc/library_se
 
 - [ ] Smoke-test: `cargo run -p library-api --bin library-server`.
 
-**Alternative:** `connect.into_axum_router()` merged with `.merge()` if you prefer a sub-router instead of `fallback_service`—`fallback_service` is the usual pattern when RPC paths are dynamic (`/library.v1.LibraryService/GetHealth`).
+**Alternative:** `connect.into_axum_router()` merged with `.merge()` if you prefer a sub-router instead of `fallback_service`; `fallback_service` remains the simplest default when RPC paths are dynamic (`/library.v1.LibraryService/GetHealth`).
 
 ---
 

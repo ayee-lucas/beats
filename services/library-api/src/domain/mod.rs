@@ -1,3 +1,3 @@
-//! Pure catalogue models & repository traits (**no** `tonic` / `proto_gen`).
+//! Pure catalogue models & repository traits.
 
 pub mod repositories;

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use library_api::{
-    adapters::grpc::GrpcLibraryService, application::usecases::get_health::GetHealthHandler,
+    adapters::connect::ConnectLibraryService, application::usecases::get_health::GetHealthHandler,
     infrastructure::NoopSongRepository,
 };
 

@@ -1,3 +1,3 @@
-//! Delivery mechanisms (**gRPC**, future HTTP).
+//! Delivery mechanisms (**connect protocol**).
 
-pub mod grpc;
+pub mod connect;

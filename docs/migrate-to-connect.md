@@ -6,6 +6,25 @@ Related docs: [architecture-decisions.md](./architecture-decisions.md), [clean-a
 
 ---
 
+## Current progress
+
+| Section | Status |
+|---------|--------|
+| 0. Prerequisites | Partial — Rust version done; listen addr / plugin pins still open |
+| 1. Codegen tooling | Done |
+| 2. `buf.gen.yaml` | Done |
+| 3. `proto-gen` | Done (`cargo build -p proto-gen` passes) |
+| 4. `library-api` deps | Done (`tonic` removed; keep `async-trait` for repositories) |
+| 5. Transport adapter | Done (`cargo build -p library-api --lib` passes) |
+| 6. `server.rs` (Axum) | Next — stub still references `GrpcLibraryService` / `:50051`; not serving yet |
+| 7–10 | Later |
+
+**Important version rule learned during codegen:** keep `protoc-gen-buffa`, `buffa`, `buffa-types`, `connectrpc`, and `protoc-gen-connect-rust` on the **same release family**. Mixing `buffa` 0.9 codegen with `buffa`/`connectrpc` 0.8 runtimes fails.
+
+**Important `async-trait` rule:** keep it while `SongRepository` uses `async fn` behind `Arc<dyn SongRepository>`. Removing it requires a separate repository-abstraction refactor, not part of this transport migration.
+
+---
+
 ## Hosting
 
 **Decision:** use **Axum** + connect-rust’s **`Router::into_axum_service()`** (via `fallback_service`).
@@ -27,6 +46,7 @@ Use cases and domain code are unchanged when switching hosting; only `server.rs`
 - [x] Confirm **Rust ≥ 1.88** locally and in CI (connect-rust MSRV).
 - [ ] Choose listen address: e.g. keep `[::1]` but use an **HTTP** port (e.g. `8080`) and document `http://` for clients (not `grpc://` on `50051`).
 - [ ] Record plugin versions in README or Makefile comments for reproducibility.
+  - Known working local set: `protoc-gen-buffa` / `buffa` / `buffa-types` **0.8.x**, `connectrpc` / `connectrpc-codegen` **0.8.x**.
 
 ---
 
@@ -36,6 +56,13 @@ Requires [Buf](https://buf.build/docs/installation) (already used).
 
 - [x] Install **`protoc-gen-buffa`** and **`protoc-gen-buffa-packaging`** — [buffa](https://github.com/anthropics/buffa) releases or `cargo install`.
 - [x] Install **`protoc-gen-connect-rust`** — [GitHub release](https://github.com/anthropics/connect-rust/releases) or `cargo install --locked connectrpc-codegen`.
+
+Confirm versions stay aligned:
+
+```bash
+protoc-gen-buffa --version
+protoc-gen-connect-rust --version   # or: cargo install --list | rg connectrpc
+```
 
 ---
 
@@ -76,30 +103,25 @@ Use `extern_path=.=::proto_gen::proto` (leading `::` on the Rust path) so connec
 ## 3. Rework `crates/proto-gen`
 
 - [x] Replace checked-in **`gen/library/v1/library.v1.rs`** and **`library.v1.tonic.rs`** with buffa + connect trees under `gen/buffa` and `gen/connect`.
-- [x] Update **`src/lib.rs`** to expose modules, for example:
+- [x] Update **`src/lib.rs`** to expose modules:
 
   ```rust
+  extern crate self as proto_gen;
+
   #[path = "../gen/buffa/mod.rs"]
   pub mod proto;
   #[path = "../gen/connect/mod.rs"]
   pub mod connect;
   ```
 
-  Keep the public module names as `proto` and `connect`. This is a crate-local module mount, and
-  the generated Connect code expects paths like `::proto_gen::proto::...`.
+  - Keep public module names as **`proto`** and **`connect`**.
+  - `extern crate self as proto_gen;` is required so generated Connect code can refer to `::proto_gen::proto::...` from inside the same crate.
+  - Prefer `pub mod` over `pub use ...::*` so namespaces stay intact.
 
-- [x] Update **`Cargo.toml`**: remove `tonic`, `tonic-prost`, `prost`; add connect-rust generated deps (`connectrpc`, `buffa`, `buffa-types`, `serde`, `serde_json`, `http-body` — see [connect-rust README](https://github.com/anthropics/connect-rust#generated-code-dependencies)).
-- [x] Add crate-root allows if the compiler requires them:
-
-  ```rust
-  #![allow(refining_impl_trait_internal, refining_impl_trait_reachable)]
-  ```
-
-- [x] `cargo build -p proto-gen` and commit regenerated `gen/`.
-
-**Checkpoint:** finish this section before touching runtime wiring. If `src/lib.rs` still points at
-deleted Tonic outputs (`gen/library/v1/...`), downstream code will show unresolved imports even if
-`server.rs` itself has not been migrated yet.
+- [x] Update **`Cargo.toml`**: remove `tonic`, `tonic-prost`, `prost`; add connect-rust generated deps (`connectrpc`, `buffa`, `buffa-types`, `serde`, `serde_json`, `http-body`).
+  - Keep **`connectrpc` / `buffa` / `buffa-types` / `protoc-gen-buffa` on the same release family** (currently **0.8.x**). Mixing buffa **0.9** codegen with **0.8** runtimes fails.
+- [x] Add crate-root allows only if the compiler requires them (not needed for current successful `proto-gen` build).
+- [x] `cargo build -p proto-gen` succeeds.
 
 ---
 
@@ -108,69 +130,88 @@ deleted Tonic outputs (`gen/library/v1/...`), downstream code will show unresolv
 **`services/library-api/Cargo.toml`:**
 
 - [x] Remove **`tonic`**.
-- [x] Keep **`async-trait`** for now; it is still used by `SongRepository` and related `Arc<dyn ...>` wiring, so it is **not** gRPC-adapter-only today.
-- [x] Add **`connectrpc`** with `features = ["axum"]` (Axum integration for `into_axum_service` / `into_axum_router`).
-- [x] Add **`axum`** and **`tokio`** with `net` (for `TcpListener` + `axum::serve`).
+- [x] Keep **`async-trait`** for repository `async fn` + `Arc<dyn SongRepository>` (do not remove as part of this transport migration).
+- [x] Add **`connectrpc`** with `features = ["axum"]`.
+- [x] Add **`axum`** and **`tokio`** with `net`.
 - [x] Keep **`proto-gen`** path dependency.
+- [x] `cargo build -p library-api` passes with stubbed `server.rs`.
 
-Example:
-
-```toml
-connectrpc = { version = "0.8.1", features = ["axum"] }
-axum = "0.8"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
-async-trait = "0.1"
-```
-
-- [x] `cargo build -p library-api` (currently passes with a stubbed `server.rs`; runtime behavior still depends on steps 5–6).
-
-**Current state:** `library-api` now builds without Tonic. `server.rs` is intentionally a temporary
-stub and does not start any listener yet; the next work is to replace the old `grpc` adapter with a
-Connect adapter and then mount it on Axum.
+**Lesson learned:** removing `async-trait` without changing repository traits breaks `Arc<dyn SongRepository>` because plain `async fn` traits are not dyn-compatible. Treat any `async-trait` removal as a separate refactor.
 
 ---
 
-## 5. Transport adapter
+## 5. Transport adapter — DONE
 
-Largest application change. **Do not** hand-write `trait LibraryService` — implement the **generated** Connect trait from `proto_gen::connect::…`.
+Largest application change. **Do not** hand-write `trait LibraryService` — implement the **generated** Connect trait.
 
-- [ ] Add module **`src/adapters/connect/`** and move the service adapter there.
-- [ ] Rename **`GrpcLibraryService`** to **`ConnectLibraryService`**.
-- [ ] Implement the generated trait from `proto_gen::connect::library::v1::...`, not a handwritten service trait.
-- [ ] Port the existing health logic from the Tonic adapter to Connect request/response types:
+- [x] Add module **`src/adapters/connect/`**.
+- [x] Rename type to **`ConnectLibraryService`** with `GetHealthHandler` field + `new`.
+- [x] Update **`src/adapters/mod.rs`** to `pub mod connect` (old `grpc/` removed).
+- [x] Keep `connectrpc` / `proto_gen` out of **`domain/`** and **`application/`**.
+- [x] Implement generated **`LibraryService`** for `ConnectLibraryService`.
 
-  | Tonic (today) | Connect |
-  |---------------|---------|
-  | `tonic::Request<GetHealthRequest>` | `RequestContext` + `OwnedView<GetHealthRequestView<'_>>` |
-  | `Result<tonic::Response<…>, tonic::Status>` | `ServiceResult<GetHealthResponse>` / `Response::ok(…)` |
-  | `map_ping_error` → `tonic::Status` | `ConnectError` + `ErrorCode` (e.g. `Unavailable`) |
+  Source of truth: `crates/proto-gen/gen/connect/library.v1.library.__connect.rs`
 
-- [ ] Recreate `map_ping_error` in Connect terms (`ConnectError`, `ErrorCode::Unavailable`).
-- [ ] Update **`src/adapters/mod.rs`** to export `connect` instead of `grpc`.
-- [ ] Delete or retire the old **`src/adapters/grpc/`** module once the Connect adapter is in place.
-- [ ] **Do not** import `connectrpc` / `proto_gen` in **`domain/`** or **`application/`** — only the adapter and binaries.
+  For connect-rust **0.8.1**, the method looks like:
 
-**Implementation note:** keep the adapter thin. It should only translate:
+  ```rust
+  fn get_health(
+      &self,
+      ctx: RequestContext,
+      request: ServiceRequest<'_, GetHealthRequest>,
+  ) -> ... ServiceResult<...>
+  ```
 
-- generated request types → application inputs
-- domain/application errors → Connect transport errors
-- application results → generated response types
+  Prefer the generated signature over older doc wording that said `OwnedView<GetHealthRequestView<'_>>`.
 
-Reference: previous Tonic adapter logic lives at `services/library-api/src/adapters/grpc/library_service.rs`.
+- [x] Inside `get_health`:
+  1. Read caller name from the request view (`request.name` via `Deref` on `ServiceRequest`).
+  2. Own it before the use case: `let name = String::from(request.name);` (or `to_owned()`).
+  3. Call `self.get_health.run(name).await.map_err(map_ping_error)?`
+  4. Return:
+
+     ```rust
+     Response::ok(GetHealthResponse {
+         status: outcome.message,
+         ..Default::default()
+     })
+     ```
+
+- [x] Add `map_ping_error`:
+
+  ```rust
+  fn map_ping_error(err: PingError) -> ConnectError {
+      match err {
+          PingError::BackendUnavailable => {
+              ConnectError::unavailable("library persistence unavailable")
+          }
+      }
+  }
+  ```
+
+- [x] Imports used in the adapter:
+
+  ```rust
+  use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
+  use proto_gen::connect::library::v1::LibraryService;
+  use proto_gen::proto::library::v1::{GetHealthRequest, GetHealthResponse};
+  ```
+
+- [x] `#[allow(refining_impl_trait_reachable)]` on `get_health` (concrete return refines generated `impl Encodable<...>`).
+- [x] `cargo build -p library-api --lib` succeeds.
+
+Fixing `server.rs` naming (`GrpcLibraryService` → `ConnectLibraryService`) and Axum hosting is **section 6**.
 
 ---
 
-## 6. Composition root — `server.rs` (Axum)
+## 6. Composition root — `server.rs` (Axum) — NEXT
 
-**`services/library-api/src/server.rs`:**
+**Current `server.rs`:** broken stub. It still calls `GrpcLibraryService` and listens on `:50051` / `grpc://`; it does not serve HTTP yet. The lib adapter is ready (`ConnectLibraryService::new` exists).
 
-- [x] Remove Tonic server wiring. The file is currently a compile-only stub and no longer starts a server.
+- [x] Remove `LibraryServiceServer::new` and `tonic::transport::Server`.
 - [ ] Keep wiring: `NoopSongRepository` → `GetHealthHandler` → adapter `Arc`.
-- [ ] Replace `GrpcLibraryService` usage with `ConnectLibraryService`.
-- [ ] Build a `connectrpc::Router`, register the service on it, and mount it into Axum.
-- [ ] Add a simple `GET /health` route on the Axum router.
-- [ ] Bind a Tokio `TcpListener` on an HTTP port (for example `[::1]:8080`) and serve the Axum app.
-- [ ] Register the Connect service and mount it on Axum:
+- [ ] Use `ConnectLibraryService` (not `GrpcLibraryService`).
+- [ ] Register + mount on Axum:
 
   ```rust
   //! Binary composition root: wire `Arc`s, Axum app with Connect fallback.
@@ -184,6 +225,8 @@ Reference: previous Tonic adapter logic lives at `services/library-api/src/adapt
       application::usecases::get_health::GetHealthHandler,
       infrastructure::NoopSongRepository,
   };
+  // Needed so `.register(...)` is in scope:
+  use proto_gen::connect::library::v1::LibraryServiceExt;
 
   #[tokio::main]
   async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -228,8 +271,8 @@ Reference: previous Tonic adapter logic lives at `services/library-api/src/adapt
 After the code migration (or in the same PR):
 
 - [ ] **`docs/architecture-decisions.md`**: Prost/Tonic → buffa/connect-rust + **Axum**; Buf plugins; HTTP transport (Connect + gRPC + gRPC-Web).
-- [ ] **`docs/clean-architecture-layers.md`**: adapter boundary types (`RequestContext`, `ConnectError`, views); composition root uses **Axum** + Connect `fallback_service`.
-- [ ] **`Makefile`**: `help` / comments — note buffa + connect plugins, not only `buf`.
+- [ ] **`docs/clean-architecture-layers.md`**: adapter boundary types (`RequestContext`, `ConnectError`, views / `ServiceRequest`); composition root uses **Axum** + Connect `fallback_service`.
+- [ ] **`Makefile`**: `help` / comments — note buffa + connect plugins, not only `buf`; pin plugin versions.
 - [ ] Inline comments: `domain/repositories/song_repository.rs`, `domain/mod.rs`, adapter module — “map in Connect adapter”, not Tonic.
 
 ---
@@ -264,6 +307,7 @@ After the code migration (or in the same PR):
 - [ ] Pin **`connectrpc` / `buffa` / `axum`** in workspace `[workspace.dependencies]`.
 - [ ] CI: install plugins, `buf generate`, fail on dirty `gen/`.
 - [ ] **Interceptors** (connect-rust per-RPC middleware) when needed beyond Tower layers.
+- [ ] Optional later: remove `async-trait` by refactoring repositories off `Arc<dyn Trait>` (generics or boxed futures). Separate from this transport migration.
 
 ---
 
@@ -280,8 +324,8 @@ After the code migration (or in the same PR):
 
 ## Suggested PR order
 
-1. **Codegen only** — `buf.gen.yaml`, `proto-gen/src/lib.rs`, `proto-gen/Cargo.toml`, committed `gen/`, and `cargo build -p proto-gen`.
-2. **Runtime** — adapter, Axum `server.rs`, `library-api/Cargo.toml`, retire Tonic-only imports/usages, then `/health` + RPC curl smoke tests.
+1. **Codegen only** — done: `buf.gen.yaml`, `proto-gen`, committed `gen/`, `cargo build -p proto-gen`.
+2. **Runtime** — adapter done (step 5); next: Axum `server.rs` (step 6), then curl smoke tests (step 9).
 3. **Docs** — architecture + layering docs; client when implemented.
 
 ---
@@ -294,3 +338,14 @@ After the code migration (or in the same PR):
 | **Application** | Domain only |
 | **Adapters (`connect/`)** | `proto_gen`, `connectrpc`, application, domain (for error mapping) |
 | **`server.rs`** | `library_api`, `connectrpc`, `axum`, `tokio` |
+
+---
+
+## Lessons learned (keep in mind)
+
+| Issue | Lesson |
+|-------|--------|
+| Unresolved `proto_gen::library_service_server` | Old Tonic paths after buffa/connect codegen — finish `proto-gen` `lib.rs` mount first |
+| `cannot find proto_gen in the crate root` | Add `extern crate self as proto_gen;` in `proto-gen` |
+| `HasMessageView` / dual `buffa` versions | Align plugin + crate versions (`protoc-gen-buffa` must match `buffa`) |
+| Removing `async-trait` broke repositories | Keep it while using `async fn` + `Arc<dyn SongRepository>` |

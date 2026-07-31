@@ -7,12 +7,12 @@ use std::sync::Arc;
 
 use library_api::{
     adapters::connect::ConnectLibraryService, application::usecases::get_health::GetHealthHandler,
-    infrastructure::NoopSongRepository,
+    infrastructure::NoopLibraryRepository,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let songs = NoopSongRepository::arc();
+    let songs = NoopLibraryRepository::arc();
     let get_health = Arc::new(GetHealthHandler::new(songs));
     let library_svc = Arc::new(ConnectLibraryService::new(Arc::clone(&get_health)));
     let connect = library_svc.register(ConnectRouter::new());

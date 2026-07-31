@@ -2,4 +2,4 @@
 
 pub mod noop_song_repository;
 
-pub use noop_song_repository::NoopSongRepository;
+pub use noop_song_repository::NoopLibraryRepository;

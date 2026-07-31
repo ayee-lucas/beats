@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::domain::repositories::{PingError, SongRepository};
+use crate::domain::repositories::{LibraryRepository, PingError};
 
 /// Result of **`GetHealth`**: **`application`** stays free of Protobuf structs.
 #[derive(Debug)]
@@ -9,11 +9,11 @@ pub struct HealthOutcome {
 }
 
 pub struct GetHealthHandler {
-    songs: Arc<dyn SongRepository>,
+    songs: Arc<dyn LibraryRepository>,
 }
 
 impl GetHealthHandler {
-    pub fn new(songs: Arc<dyn SongRepository>) -> Self {
+    pub fn new(songs: Arc<dyn LibraryRepository>) -> Self {
         Self { songs }
     }
 

@@ -1,5 +1,5 @@
-//! Persistence **traits** catalogue code depends on (**impl`s** live **`infrastructure/`**).
+//! Persistence **traits** catalogue code depends on (**impl`s** live).
 
-mod song_repository;
+mod library_repository;
 
-pub use song_repository::{PingError, SongRepository};
+pub use library_repository::{LibraryRepository, PingError};

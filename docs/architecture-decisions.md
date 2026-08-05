@@ -148,7 +148,7 @@ For a fuller layering picture, including optional evolution into workspace crate
 **Consequences.**
 
 - New RPC or job types usually add or extend **`application/usecases/<use_case>`**, keeping reviewers oriented by **intent** (“what triggered this”).
-- Persistence contracts (**`trait SongRepository`**, siblings) ship next to **`domain`** code (on-disk **`domain/repositories/`**) so tests attach **repo mocks** beside **pure model** assertions.
+- Persistence contracts (**`trait LibraryRepository`**, siblings) ship next to **`domain`** code (on-disk **`domain/repositories/`**) so tests attach **repo mocks** beside **pure model** assertions.
 - Composition root (**`library-server`**) binds **infra → domain traits** plus **handlers** consuming those trait objects.
 
 ---

@@ -10,18 +10,21 @@ Related docs: [architecture-decisions.md](./architecture-decisions.md), [clean-a
 
 | Section | Status |
 |---------|--------|
-| 0. Prerequisites | Partial — Rust version done; listen addr / plugin pins still open |
+| 0. Prerequisites | Partial — Rust ≥ 1.88 + listen `http://[::1]:8080`; plugin pins still open |
 | 1. Codegen tooling | Done |
 | 2. `buf.gen.yaml` | Done |
 | 3. `proto-gen` | Done (`cargo build -p proto-gen` passes) |
 | 4. `library-api` deps | Done (`tonic` removed; keep `async-trait` for repositories) |
 | 5. Transport adapter | Done (`cargo build -p library-api --lib` passes) |
-| 6. `server.rs` (Axum) | Next — stub still references `GrpcLibraryService` / `:50051`; not serving yet |
-| 7–10 | Later |
+| 6. `server.rs` (Axum) | Done — serves on `[::1]:8080` with `/health` + Connect fallback |
+| 7. Client binary | Later — still a stub |
+| 8. Docs (arch / layers / Makefile) | Next |
+| 9. Verification | Mostly done — workspace build + curl smoke tests passed |
+| 10. Optional | Later |
 
 **Important version rule learned during codegen:** keep `protoc-gen-buffa`, `buffa`, `buffa-types`, `connectrpc`, and `protoc-gen-connect-rust` on the **same release family**. Mixing `buffa` 0.9 codegen with `buffa`/`connectrpc` 0.8 runtimes fails.
 
-**Important `async-trait` rule:** keep it while `SongRepository` uses `async fn` behind `Arc<dyn SongRepository>`. Removing it requires a separate repository-abstraction refactor, not part of this transport migration.
+**Important `async-trait` rule:** keep it while `LibraryRepository` uses `async fn` behind `Arc<dyn LibraryRepository>`. Removing it requires a separate repository-abstraction refactor, not part of this transport migration.
 
 ---
 
@@ -44,9 +47,10 @@ Use cases and domain code are unchanged when switching hosting; only `server.rs`
 ## 0. Prerequisites
 
 - [x] Confirm **Rust ≥ 1.88** locally and in CI (connect-rust MSRV).
-- [ ] Choose listen address: e.g. keep `[::1]` but use an **HTTP** port (e.g. `8080`) and document `http://` for clients (not `grpc://` on `50051`).
+- [x] Choose listen address: **`[::1]:8080`** over HTTP (`http://`, not `grpc://` on `50051`).
 - [ ] Record plugin versions in README or Makefile comments for reproducibility.
   - Known working local set: `protoc-gen-buffa` / `buffa` / `buffa-types` **0.8.x**, `connectrpc` / `connectrpc-codegen` **0.8.x**.
+  - Optional polish: `server.rs` still logs `connect://`; prefer `http://` in the listen message.
 
 ---
 
@@ -130,13 +134,13 @@ Use `extern_path=.=::proto_gen::proto` (leading `::` on the Rust path) so connec
 **`services/library-api/Cargo.toml`:**
 
 - [x] Remove **`tonic`**.
-- [x] Keep **`async-trait`** for repository `async fn` + `Arc<dyn SongRepository>` (do not remove as part of this transport migration).
+- [x] Keep **`async-trait`** for repository `async fn` + `Arc<dyn LibraryRepository>` (do not remove as part of this transport migration).
 - [x] Add **`connectrpc`** with `features = ["axum"]`.
 - [x] Add **`axum`** and **`tokio`** with `net`.
 - [x] Keep **`proto-gen`** path dependency.
-- [x] `cargo build -p library-api` passes with stubbed `server.rs`.
+- [x] `cargo build -p library-api` passes (Axum `library-server` binary included).
 
-**Lesson learned:** removing `async-trait` without changing repository traits breaks `Arc<dyn SongRepository>` because plain `async fn` traits are not dyn-compatible. Treat any `async-trait` removal as a separate refactor.
+**Lesson learned:** removing `async-trait` without changing repository traits breaks `Arc<dyn LibraryRepository>` because plain `async fn` traits are not dyn-compatible. Treat any `async-trait` removal as a separate refactor.
 
 ---
 
@@ -200,57 +204,56 @@ Largest application change. **Do not** hand-write `trait LibraryService` — imp
 - [x] `#[allow(refining_impl_trait_reachable)]` on `get_health` (concrete return refines generated `impl Encodable<...>`).
 - [x] `cargo build -p library-api --lib` succeeds.
 
-Fixing `server.rs` naming (`GrpcLibraryService` → `ConnectLibraryService`) and Axum hosting is **section 6**.
-
 ---
 
-## 6. Composition root — `server.rs` (Axum) — NEXT
+## 6. Composition root — `server.rs` (Axum) — DONE
 
-**Current `server.rs`:** broken stub. It still calls `GrpcLibraryService` and listens on `:50051` / `grpc://`; it does not serve HTTP yet. The lib adapter is ready (`ConnectLibraryService::new` exists).
+**Current `server.rs`:** wires `NoopLibraryRepository` → `GetHealthHandler` → `ConnectLibraryService`, registers Connect, mounts Axum with `GET /health` + `fallback_service(connect.into_axum_service())`, listens on **`[::1]:8080`**.
 
 - [x] Remove `LibraryServiceServer::new` and `tonic::transport::Server`.
-- [ ] Keep wiring: `NoopSongRepository` → `GetHealthHandler` → adapter `Arc`.
-- [ ] Use `ConnectLibraryService` (not `GrpcLibraryService`).
-- [ ] Register + mount on Axum:
+- [x] Keep wiring: `NoopLibraryRepository` → `GetHealthHandler` → adapter `Arc`.
+- [x] Use `ConnectLibraryService` (not `GrpcLibraryService`).
+- [x] Register + mount on Axum (`LibraryServiceExt::register`, `into_axum_service`, `fallback_service`).
+- [x] Smoke-test: `cargo run -p library-api --bin library-server` (serves HTTP + Connect).
 
-  ```rust
-  //! Binary composition root: wire `Arc`s, Axum app with Connect fallback.
+Reference shape (matches the working binary; local names may differ slightly):
 
-  use std::sync::Arc;
+```rust
+//! Binary composition root: wire `Arc`s, Axum app with Connect fallback.
 
-  use axum::{Router, routing::get};
-  use connectrpc::Router as ConnectRouter;
-  use library_api::{
-      adapters::connect::ConnectLibraryService,
-      application::usecases::get_health::GetHealthHandler,
-      infrastructure::NoopSongRepository,
-  };
-  // Needed so `.register(...)` is in scope:
-  use proto_gen::connect::library::v1::LibraryServiceExt;
+use std::sync::Arc;
 
-  #[tokio::main]
-  async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-      let songs = NoopSongRepository::arc();
-      let get_health = Arc::new(GetHealthHandler::new(songs));
+use axum::{Router, routing::get};
+use connectrpc::Router as ConnectRouter;
+use library_api::{
+    adapters::connect::ConnectLibraryService,
+    application::usecases::get_health::GetHealthHandler,
+    infrastructure::NoopLibraryRepository,
+};
+// Needed so `.register(...)` is in scope:
+use proto_gen::connect::library::v1::LibraryServiceExt;
 
-      let library = Arc::new(ConnectLibraryService::new(Arc::clone(&get_health)));
-      let connect = library.register(ConnectRouter::new());
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let library_repo = NoopLibraryRepository::arc();
+    let get_health = Arc::new(GetHealthHandler::new(library_repo));
 
-      let app = Router::new()
-          .route("/health", get(|| async { "OK" }))
-          .fallback_service(connect.into_axum_service());
+    let library = Arc::new(ConnectLibraryService::new(Arc::clone(&get_health)));
+    let connect = library.register(ConnectRouter::new());
 
-      let addr = "[::1]:8080";
-      let listener = tokio::net::TcpListener::bind(addr).await?;
-      eprintln!("library-server listening http://{addr} (Axum + Connect + gRPC + gRPC-Web)");
+    let app = Router::new()
+        .route("/health", get(|| async { "OK" }))
+        .fallback_service(connect.into_axum_service());
 
-      axum::serve(listener, app).await?;
+    let addr = "[::1]:8080";
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    eprintln!("library-server listening http://{addr} (Axum + Connect + gRPC + gRPC-Web)");
 
-      Ok(())
-  }
-  ```
+    axum::serve(listener, app).await?;
 
-- [ ] Smoke-test: `cargo run -p library-api --bin library-server`.
+    Ok(())
+}
+```
 
 **Alternative:** `connect.into_axum_router()` merged with `.merge()` if you prefer a sub-router instead of `fallback_service`; `fallback_service` remains the simplest default when RPC paths are dynamic (`/library.v1.LibraryService/GetHealth`).
 
@@ -273,21 +276,21 @@ After the code migration (or in the same PR):
 - [ ] **`docs/architecture-decisions.md`**: Prost/Tonic → buffa/connect-rust + **Axum**; Buf plugins; HTTP transport (Connect + gRPC + gRPC-Web).
 - [ ] **`docs/clean-architecture-layers.md`**: adapter boundary types (`RequestContext`, `ConnectError`, views / `ServiceRequest`); composition root uses **Axum** + Connect `fallback_service`.
 - [ ] **`Makefile`**: `help` / comments — note buffa + connect plugins, not only `buf`; pin plugin versions.
-- [ ] Inline comments: `domain/repositories/song_repository.rs`, `domain/mod.rs`, adapter module — “map in Connect adapter”, not Tonic.
+- [ ] Inline comments: `domain/repositories/library_repository.rs`, `domain/mod.rs`, adapter module — “map in Connect adapter”, not Tonic.
 
 ---
 
 ## 9. Verification
 
-- [ ] `cargo build --workspace`
-- [ ] `cargo run -p library-api --bin library-server`
-- [ ] Plain HTTP health (Axum):
+- [x] `cargo build --workspace`
+- [x] `cargo run -p library-api --bin library-server`
+- [x] Plain HTTP health (Axum):
 
   ```bash
   curl -s 'http://[::1]:8080/health'
   ```
 
-- [ ] Connect JSON RPC:
+- [x] Connect JSON RPC:
 
   ```bash
   curl -X POST 'http://[::1]:8080/library.v1.LibraryService/GetHealth' \
@@ -325,8 +328,9 @@ After the code migration (or in the same PR):
 ## Suggested PR order
 
 1. **Codegen only** — done: `buf.gen.yaml`, `proto-gen`, committed `gen/`, `cargo build -p proto-gen`.
-2. **Runtime** — adapter done (step 5); next: Axum `server.rs` (step 6), then curl smoke tests (step 9).
-3. **Docs** — architecture + layering docs; client when implemented.
+2. **Runtime** — done: Connect adapter (step 5), Axum `server.rs` (step 6), curl smoke tests (step 9).
+3. **Docs** — next: architecture + layering docs, Makefile plugin pins (step 8); fix stale “map to tonic” comments in domain.
+4. **Client** — optional: implement `library-client` when needed (step 7).
 
 ---
 
@@ -348,4 +352,4 @@ After the code migration (or in the same PR):
 | Unresolved `proto_gen::library_service_server` | Old Tonic paths after buffa/connect codegen — finish `proto-gen` `lib.rs` mount first |
 | `cannot find proto_gen in the crate root` | Add `extern crate self as proto_gen;` in `proto-gen` |
 | `HasMessageView` / dual `buffa` versions | Align plugin + crate versions (`protoc-gen-buffa` must match `buffa`) |
-| Removing `async-trait` broke repositories | Keep it while using `async fn` + `Arc<dyn SongRepository>` |
+| Removing `async-trait` broke repositories | Keep it while using `async fn` + `Arc<dyn LibraryRepository>` |

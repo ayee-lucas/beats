@@ -61,12 +61,12 @@ services/library-api/src/
 │   └── usecases/
 │       ├── mod.rs
 │       └── get_health/
-│           └── handler.rs         # may inject Arc<dyn domain::repositories::SongRepository>, …
+│           └── handler.rs         # may inject Arc<dyn domain::repositories::LibraryRepository>, …
 ├── domain/
 │   ├── repositories/
-│   │   └── song.rs                # pub trait SongRepository { … }
+│   │   └── library_repository.rs  # pub trait LibraryRepository { … }
 │   ├── models/
-│   │   └── song.rs
+│   │   └── library.rs
 │   └── services/                  # may depend on traits from domain/repositories
 └── adapters/
     └── grpc/

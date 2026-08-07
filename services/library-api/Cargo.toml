@@ -16,6 +16,6 @@ path = "src/client.rs"
 proto-gen = { path = "../../crates/proto-gen" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
 axum = { version = "0.8.9" }
-connectrpc = { version = "0.8.1", features = ["axum"] }
+connectrpc = { version = "0.8.1", features = ["axum", "client"] }
 async-trait = "0.1.91"
-
+http = '1.5.0'

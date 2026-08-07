@@ -4,18 +4,18 @@ use async_trait::async_trait;
 
 use crate::domain::repositories::{LibraryRepository, PingError};
 
-/// Development stand-in backing storage—not for production workloads.
+/// In-memory stand-in; not for production.
 #[derive(Debug, Default)]
-pub struct NoopLibraryRepository;
+pub struct InMemoryLibraryRepository;
 
-impl NoopLibraryRepository {
+impl InMemoryLibraryRepository {
     pub fn arc() -> Arc<dyn LibraryRepository> {
-        Arc::new(NoopLibraryRepository)
+        Arc::new(InMemoryLibraryRepository)
     }
 }
 
 #[async_trait]
-impl LibraryRepository for NoopLibraryRepository {
+impl LibraryRepository for InMemoryLibraryRepository {
     async fn ping(&self) -> Result<(), PingError> {
         Ok(())
     }

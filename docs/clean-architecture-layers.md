@@ -1,11 +1,11 @@
 # Clean architecture layering (library API)
 
-Guidelines for how **beats** should structure the **library gRPC service** so domain rules stay isolated from transports and frameworks. Aligns with the workspace described in [`architecture-decisions.md`](./architecture-decisions.md).
+Guidelines for how **beats** should structure the **library API** so domain rules stay isolated from transports and frameworks. Aligns with the workspace described in [`architecture-decisions.md`](./architecture-decisions.md).
 
 ## Goals
 
-- Keep **business rules** testable without a running gRPC stack.
-- Restrict **`proto-gen`** usage to **edges** that speak Protobuf/Tonic (`tonic::Request`, generated messages).
+- Keep **business rules** testable without a running HTTP/Connect stack.
+- Restrict **`proto-gen`** / **`connectrpc`** usage to **edges** (`RequestContext`, `ServiceRequest`, generated messages, `ConnectError`).
 - Preserve **thin** composition roots (`library-server`, `library-client`) that only wire implementations.
 
 ---
@@ -17,13 +17,13 @@ Think of rings from **outside** (frameworks and I/O) to **inside** (pure domain)
 ```text
                     ┌─────────────────────────────────────┐
                     │     Frameworks & drivers            │
-                    │  Tokio, Tonic, DB clients, filesystem │
+                    │  Tokio, Axum, connectrpc, DB, fs    │
                     └─────────────────┬───────────────────┘
                                       │
                     ┌─────────────────▼───────────────────┐
                     │      Interface adapters             │
-                    │  gRPC: impl of generated traits     │
-                    │  (map Request / Response ↔ app)    │
+                    │  Connect: impl of generated traits  │
+                    │  (map ServiceRequest ↔ app)         │
                     └─────────────────┬───────────────────┘
                                       │
                     ┌─────────────────▼───────────────────┐
@@ -35,7 +35,7 @@ Think of rings from **outside** (frameworks and I/O) to **inside** (pure domain)
                     │            Domain                    │
                     │   entities, repositories (traits),  │
                     │   domain services                     │
-                    │   no tonic, no proto-gen              │
+                    │   no connectrpc, no proto-gen        │
                     └──────────────────────────────────────┘
 ```
 
@@ -48,7 +48,7 @@ This workspace follows [**§8 — Application layer organized by use case**](./a
 - **`application/usecases/<use_case>/`** — orchestration for one triggered operation (often aligned with an RPC or job): transaction span, sequencing, retries, assembling arguments for **pure** **`domain`** code.
 - **`domain/repositories/`** — **Rust traits** for catalogue persistence (implemented **under **`infrastructure/`**, which depends **on **`domain`**).
 - **`application/ports/`** (optional) — **non-repository** outbound traits (**`Clock`**, messaging, …). Do **not** duplicate catalogue **`repository`** traits here; those stay **`domain/repositories/`**.
-- **`domain/models`** and **`domain/services`** encode **meaning** and catalogue rules (**no `tonic`**, **`proto-gen`**, or databases).
+- **`domain/models`** and **`domain/services`** encode **meaning** and catalogue rules (**no `connectrpc`**, **`proto-gen`**, or databases).
 
 Example shape (illustrative):
 
@@ -69,20 +69,29 @@ services/library-api/src/
 │   │   └── library.rs
 │   └── services/                  # may depend on traits from domain/repositories
 └── adapters/
-    └── grpc/
+    └── connect/
         └── library_service.rs     # impl LibraryService → application::usecases::get_health::…
 ```
 
 ---
 
-## Generated gRPC code
+## Generated Connect code
 
-Tonic emits a server trait (`LibraryService`) and wrappers such as `LibraryServiceServer`.
+connect-rust (via Buf) emits a server trait (`LibraryService`), registration helpers (`LibraryServiceExt`), and `LibraryServiceClient`.
 
 - **`crates/proto-gen`** remains the **contract surface** only ([§5 in architecture decisions](./architecture-decisions.md#5-proto-gen-crate-as-a-thin-facade)). Do not put business logic there.
-- **Implement `LibraryService` in `services/library-api`**, inside an adapter module (for example `grpc/` or `adapters/grpc/`). Never modify generated stubs for behavior.
+- **Implement `LibraryService` in `services/library-api`**, inside **`adapters/connect/`**. Never modify generated stubs for behavior.
 
-The adapter implementation should stay **thin**: validate or extract inputs, call application services, translate errors to `tonic::Status`, wrap responses in `tonic::Response`.
+The adapter implementation should stay **thin**: read inputs from **`ServiceRequest`** / message views, own what the use case needs, call application handlers, map domain errors to **`ConnectError`**, return **`Response::ok(...)`**.
+
+Boundary types that belong in the adapter (not domain/application):
+
+| Type | Role |
+|------|------|
+| `RequestContext` | Per-call Connect context |
+| `ServiceRequest<'_, T>` | Borrowed request wrapper / views |
+| `ConnectError` | Wire error codes |
+| `Response` / `ServiceResult` | Encodeable success path |
 
 ---
 
@@ -91,19 +100,21 @@ The adapter implementation should stay **thin**: validate or extract inputs, cal
 The **`library-server`** binary is the primary **composition root** for hosting the API:
 
 1. Build **infrastructure** that **`impl`** **`domain/repositories`** traits (and **`application::ports`** when used).
-2. Instantiate **handlers** (**`application/usecases/<use_case>`**) with those **`Arc<dyn …>`** dependencies (repository traits from **`domain`**, other traits from **`application::ports`** when needed).
-3. Build the **gRPC adapter** that implements `LibraryService` and delegates to application code.
-4. Pass the adapter into `LibraryServiceServer::new(...)`, attach to Tokio/Tonic serve.
+2. Instantiate **handlers** (**`application/usecases/<use_case>`**) with those **`Arc<dyn …>`** dependencies.
+3. Build the **Connect adapter** (`ConnectLibraryService`) that implements generated `LibraryService` and delegates to application code.
+4. `register` on a Connect router, mount on **Axum** (`GET /health` + `fallback_service(connect.into_axum_service())`), serve with Tokio.
 
-As shared code grows, prefer a **`src/lib.rs`** in `library-api` so inner modules (`domain`, `application`, `grpc`) are library code and **`src/server.rs` (or `src/bin/library-server.rs`) stays a slim `main`**.
+As shared code grows, prefer a **`src/lib.rs`** in `library-api` so inner modules (`domain`, `application`, `adapters`) are library code and **`src/server.rs` stays a slim `main`**.
 
 ---
 
 ## Client binary: `library-client`
 
-The **`library-client`** binary sits on the **same outer boundary** but on the caller side ([§7](./architecture-decisions.md#7-library-service-process-layout)). Use generated clients from **`proto-gen`** there; avoid importing inner domain modules unless the binary truly needs shared behavior—then expose a small façade from `lib`.
+The **`library-client`** binary sits on the **same outer boundary** but on the caller side ([§7](./architecture-decisions.md#7-library-service-process-layout)). Use generated **`LibraryServiceClient`**, **`HttpClient`**, and **`ClientConfig`** from **`proto-gen` / connectrpc** there; avoid importing inner domain modules unless the binary truly needs shared behavior—then expose a small façade from `lib`.
 
 When the client is only examples or tooling, keeping it beside the server is acceptable. If it becomes a standalone product CLI, moving it to its own crate (or workspace member) avoids coupling unrelated delivery concerns into the server package.
+
+Default base URL for local smoke tests: **`http://[::1]:8080`**.
 
 ---
 
@@ -130,14 +141,15 @@ When the codebase outgrows a single crate, split by layer without breaking the d
 |-----------------------|--------------------------------------------|
 | `library-domain`      | Entities, **`repositories`** (traits only), **`services`**, invariants |
 | `library-application` | Use-case modules (**`usecases/<use_case>/`**); optional **`application/ports`** (**non-repository**) |
-| `library-api` (bin + thin lib) | gRPC adapters, composition root     |
+| `library-api` (bin + thin lib) | Connect adapters, Axum composition root |
 
-The server crate depends on **application + proto-gen**. **Domain** depends on neither Tonic nor `proto-gen`.
+The server crate depends on **application + proto-gen**. **Domain** depends on neither connectrpc nor `proto-gen`.
 
 ---
 
 ## Related
 
-- [`architecture-decisions.md`](./architecture-decisions.md) — Buf, `proto-gen`, and binary naming.
+- [`architecture-decisions.md`](./architecture-decisions.md) — Buf, `proto-gen`, Axum hosting, and binary naming.
 - `proto/library/v1/library.proto` — contract source of truth.
 - `services/library-api/` — server and client entry points until refactored further.
+- [`migrate-to-connect.md`](./migrate-to-connect.md) — migration checklist.

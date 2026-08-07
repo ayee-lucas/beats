@@ -1,5 +1,3 @@
-//! Binary composition root.
-
 use axum::{Router, routing::get};
 use connectrpc::Router as ConnectRouter;
 use proto_gen::connect::library::v1::LibraryServiceExt;
@@ -7,13 +5,13 @@ use std::sync::Arc;
 
 use library_api::{
     adapters::connect::ConnectLibraryService, application::usecases::get_health::GetHealthHandler,
-    infrastructure::NoopLibraryRepository,
+    infrastructure::InMemoryLibraryRepository,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let songs = NoopLibraryRepository::arc();
-    let get_health = Arc::new(GetHealthHandler::new(songs));
+    let library_repo = InMemoryLibraryRepository::arc();
+    let get_health = Arc::new(GetHealthHandler::new(library_repo));
     let library_svc = Arc::new(ConnectLibraryService::new(Arc::clone(&get_health)));
     let connect = library_svc.register(ConnectRouter::new());
 
@@ -23,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .fallback_service(connect.into_axum_service());
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    eprintln!("library-server listening connect://{}", addr);
+    eprintln!("library-server listening http://{} (Axum + Connect + gRPC + gRPC-Web)", addr);
     axum::serve(listener, app).await?;
     Ok(())
 }

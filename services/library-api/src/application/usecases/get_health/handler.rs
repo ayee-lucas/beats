@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crate::domain::repositories::{LibraryRepository, PingError};
 
-/// Result of **`GetHealth`**: **`application`** stays free of Protobuf structs.
 #[derive(Debug)]
 pub struct HealthOutcome {
     pub message: String,

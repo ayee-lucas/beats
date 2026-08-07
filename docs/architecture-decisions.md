@@ -1,12 +1,12 @@
 # Architectural decisions
 
-This document records the main architectural choices for **beats**: a Rust workspace that exposes a **gRPC library API** defined with **Protocol Buffers** and implemented with **Tonic**.
+This document records the main architectural choices for **beats**: a Rust workspace that exposes a **library API** defined with **Protocol Buffers** and served with **[connect-rust](https://github.com/anthropics/connect-rust)** (Connect + gRPC + gRPC-Web over HTTP) on **Axum**.
 
 ## Goals
 
 - Keep API contracts **explicit and versioned** (Protobuf packages and services).
 - Share generated client and server types across binaries and future services via a **single Rust crate**.
-- Use **standard tooling** (Buf, Prost, Tonic) so generation stays reproducible and reviewable.
+- Use **standard tooling** (Buf, buffa, connect-rust) so generation stays reproducible and reviewable.
 
 ---
 
@@ -18,8 +18,8 @@ This document records the main architectural choices for **beats**: a Rust works
 
 | Path | Role |
 |------|------|
-| `crates/proto-gen` | Generated Protobuf / gRPC Rust API |
-| `services/library-api` | Binaries that host or call the library gRPC service |
+| `crates/proto-gen` | Generated Protobuf / Connect Rust API |
+| `services/library-api` | Binaries that host or call the library API |
 
 **Consequences.**
 
@@ -48,16 +48,27 @@ This document records the main architectural choices for **beats**: a Rust works
 **Decision.**
 
 - Configure Buf in `buf.yaml` with a module rooted at `./proto` and module name `buf.build/beats/core` (suitable for publishing or referencing on the Buf Schema Registry later).
-- Drive Rust generation from `buf.gen.yaml` using **remote** Buf plugins:
-  - `neoeinstein-prost` for `prost` message types
-  - `neoeinstein-tonic` for Tonic service stubs
+- Drive Rust generation from `buf.gen.yaml` using **local** plugins on `PATH`:
+  - **`protoc-gen-buffa`** (+ **`protoc-gen-buffa-packaging`**) for message types / views → `crates/proto-gen/gen/buffa`
+  - **`protoc-gen-connect-rust`** (+ buffa-packaging with `filter=services`) for Connect service stubs → `crates/proto-gen/gen/connect`
 
-Generated Rust is written to `crates/proto-gen/gen` with `clean: true` so outputs are reset each generation run.
+Generated Rust is written under `crates/proto-gen/gen/` with `clean: true` so outputs are reset each generation run.
+
+**Plugin / crate version family (keep aligned):**
+
+| Component | Known working |
+|-----------|----------------|
+| `protoc-gen-buffa` | **0.8.1** |
+| `protoc-gen-buffa-packaging` | **0.4.0** |
+| `protoc-gen-connect-rust` (`connectrpc-codegen`) | **0.8.0** |
+| `buffa` / `buffa-types` / `connectrpc` (Cargo) | **0.8.1** |
+
+Mixing buffa **0.9** codegen with **0.8** runtimes fails. See also the `Makefile` comments.
 
 **Consequences.**
 
-- Contributors run a single, documented command (`buf generate`) instead of custom scripts.
-- Plugin versions are pinned in `buf.gen.yaml`, improving reproducibility.
+- Contributors run a single, documented command (`make proto` / `buf generate`) instead of custom scripts.
+- Local plugin versions must match the Cargo crate family for a successful build.
 
 ---
 
@@ -76,32 +87,46 @@ Generated Rust is written to `crates/proto-gen/gen` with `clean: true` so output
 
 ## 5. `proto-gen` crate as a thin facade
 
-**Context.** Multiple binaries or services may need the same types and server traits.
+**Context.** Multiple binaries or services may need the same types and service traits.
 
 **Decision.** The `proto-gen` library crate:
 
-- Points at the generated module with `#[path = "../gen/library/v1/library.v1.rs"]` (and nested includes for Tonic).
-- Re-exports everything with `pub use library_proto_gen::*`.
+- Mounts generated trees as `proto` (buffa) and `connect` (connect-rust):
+
+  ```rust
+  extern crate self as proto_gen;
+
+  #[path = "../gen/buffa/mod.rs"]
+  pub mod proto;
+  #[path = "../gen/connect/mod.rs"]
+  pub mod connect;
+  ```
+
+- Depends on `connectrpc`, `buffa`, `buffa-types` (same release family as the plugins).
 
 Service crates depend on `proto-gen` via a path dependency (e.g. `proto-gen = { path = "../../crates/proto-gen" }`).
 
 **Consequences.**
 
-- **Single import surface** (`proto_gen::…`) for messages and `library_service_server::LibraryServiceServer` (and related symbols).
+- **Single import surface** (`proto_gen::proto::…`, `proto_gen::connect::…`) for messages and generated `LibraryService` / `LibraryServiceClient`.
 - The crate stays small: it does not embed business logic, only the contract.
 
 ---
 
-## 6. Async I/O with Tokio
+## 6. Async I/O with Tokio + Axum hosting
 
-**Context.** Tonic servers and clients are async.
+**Context.** connect-rust handlers are async; the recommended production-shaped host is Axum.
 
-**Decision.** The `library-api` service uses **Tokio** (`macros`, `rt-multi-thread`) as the async runtime for binaries such as `library-server`.
+**Decision.**
+
+- Use **Tokio** (`macros`, `rt-multi-thread`, `net`) as the async runtime.
+- Host **`library-server`** with **Axum**: ordinary routes (e.g. `GET /health`) plus Connect via `fallback_service(connect.into_axum_service())`.
+- Depend on `connectrpc` with features `axum` (server) and `client` (typed callers).
 
 **Consequences.**
 
-- Aligns with the Tonic/Tokio ecosystem defaults.
-- Blocking or CPU-heavy work inside request handlers should be offloaded deliberately (e.g. `spawn_blocking` or specialist workers) if added later.
+- One HTTP listener serves Connect, gRPC, and gRPC-Web (per connect-rust) alongside plain HTTP.
+- Tower middleware can compose on the Axum router when needed.
 
 ---
 
@@ -111,12 +136,12 @@ Service crates depend on `proto-gen` via a path dependency (e.g. `proto-gen = { 
 
 **Decision.** Under `services/library-api`, define separate binaries:
 
-| Binary | Purpose (intended) |
-|--------|--------------------|
-| `library-server` | Host `LibraryService` over gRPC |
-| `library-client` | Example or tool that calls the service |
+| Binary | Purpose |
+|--------|---------|
+| `library-server` | Host `LibraryService` over HTTP (Axum + Connect) |
+| `library-client` | Example / smoke tool using generated `LibraryServiceClient` |
 
-Binding defaults (e.g. `[::1]:50051` for IPv6 loopback) are chosen for **local development**; production would use configuration (environment variables or config files) when that layer is added.
+Local default listen address: **`http://[::1]:8080`** (IPv6 loopback). Production would use configuration (environment variables or config files) when that layer is added.
 
 **Consequences.**
 
@@ -127,7 +152,7 @@ Binding defaults (e.g. `[::1]:50051` for IPv6 loopback) are chosen for **local d
 
 ## 8. Application layer organized by use case
 
-**Context.** The library service will grow orchestration (“load aggregates, enforce rules, persist”) separately from stable domain semantics and separately from Tonic/protobuf.
+**Context.** The library service will grow orchestration (“load aggregates, enforce rules, persist”) separately from stable domain semantics and separately from Connect/protobuf.
 
 **Decision.** Prefer **application code grouped by use case**:
 
@@ -141,7 +166,7 @@ Optional **`services/library-api/src/application/ports/`** holds outbound traits
 
 Use-case handlers **coordinate** workflows; they typically receive **`Arc<dyn domain::repositories::…>`** (and optional **`application::ports`** types) via the composition root. **`domain/models`** and **`domain/services`** may depend on **`domain/repositories`** traits whenever read/write coupling is intrinsic to those rules.
 
-Mapping to gRPC stays in **interface adapters**: thin **`impl`** of generated traits that translate **`tonic::Request`**, call **`application/usecases/<use_case>`**, map errors and responses.
+Mapping to the wire stays in **interface adapters**: thin **`impl`** of the generated Connect **`LibraryService`** that translates **`ServiceRequest` / views**, calls **`application/usecases/<use_case>`**, and maps errors to **`ConnectError`**.
 
 For a fuller layering picture, including optional evolution into workspace crates, see [`docs/clean-architecture-layers.md`](./clean-architecture-layers.md).
 
@@ -149,7 +174,7 @@ For a fuller layering picture, including optional evolution into workspace crate
 
 - New RPC or job types usually add or extend **`application/usecases/<use_case>`**, keeping reviewers oriented by **intent** (“what triggered this”).
 - Persistence contracts (**`trait LibraryRepository`**, siblings) ship next to **`domain`** code (on-disk **`domain/repositories/`**) so tests attach **repo mocks** beside **pure model** assertions.
-- Composition root (**`library-server`**) binds **infra → domain traits** plus **handlers** consuming those trait objects.
+- Composition root (**`library-server`**) binds **infra → domain traits** plus **handlers** consuming those trait objects, then mounts Connect on Axum.
 
 ---
 
@@ -166,14 +191,16 @@ For a fuller layering picture, including optional evolution into workspace crate
 | File / directory | Purpose |
 |------------------|---------|
 | `Cargo.toml` | Workspace members and shared metadata |
-| `buf.yaml` / `buf.gen.yaml` | Buf module and Rust codegen |
-| `proto/library/v1/library.proto` | Library gRPC API definition |
-| `crates/proto-gen/` | Generated Rust + small re-export crate |
+| `buf.yaml` / `buf.gen.yaml` | Buf module and Rust codegen (buffa + connect-rust) |
+| `Makefile` | `proto` target; plugin version pins |
+| `proto/library/v1/library.proto` | Library API definition |
+| `crates/proto-gen/` | Generated Rust + thin facade (`proto` + `connect`) |
 | `services/library-api/` | Server and client binaries |
 | `services/library-api/src/application/usecases/` | Per-trigger handlers (**`<use_case>/`**) (**§8**) |
 | `services/library-api/src/domain/repositories/` | Repository **trait** definitions only (**§8**) |
-| [`docs/clean-architecture-layers.md`](./clean-architecture-layers.md) | Layering and where to implement gRPC vs domain logic |
-| [`docs/migrate-to-connect.md`](./migrate-to-connect.md) | Checklist for migrating from Tonic to connect-rust + **Axum** |
+| `services/library-api/src/adapters/connect/` | Connect transport adapter |
+| [`docs/clean-architecture-layers.md`](./clean-architecture-layers.md) | Layering and where to implement Connect vs domain logic |
+| [`docs/migrate-to-connect.md`](./migrate-to-connect.md) | Migration checklist (Tonic → connect-rust + Axum) |
 
 ---
 
@@ -185,5 +212,6 @@ For a fuller layering picture, including optional evolution into workspace crate
 | 2026-05-20 | Link clean-architecture layering doc for library service structure |
 | 2026-05-20 | **`application/usecases/<use_case>/`** for handlers (**§8**); **`domain/repositories`** for repository traits |
 | 2026-05-20 | Add [**migrate-to-connect.md**](./migrate-to-connect.md) migration checklist |
+| 2026-08-06 | Prost/Tonic → buffa/connect-rust + **Axum**; HTTP listen `[::1]:8080`; plugin version family documented |
 
 When you change a major decision (e.g. switching from committed gen to build-time only), add a short subsection here or a numbered ADR file under `docs/adr/` and link it from this document.

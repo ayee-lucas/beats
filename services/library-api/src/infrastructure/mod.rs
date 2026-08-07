@@ -1,5 +1,3 @@
-//! Concrete **`domain::repositories::…`** adapters (Postgres/`sqlx` later).
+pub mod library_repository;
 
-pub mod noop_library_repository;
-
-pub use noop_library_repository::NoopLibraryRepository;
+pub use library_repository::InMemoryLibraryRepository;

@@ -1,3 +1,3 @@
-pub mod library_repository;
+pub mod repositories;
 
-pub use library_repository::InMemoryLibraryRepository;
+pub use repositories::InMemoryLibraryRepository;

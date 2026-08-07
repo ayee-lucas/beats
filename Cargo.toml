@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/proto-gen", "services/library-api"]
+members = ["crates/proto-gen", "services/library-api", "services/library-api/migration"]
 resolver = "2"
 
 [workspace.package]

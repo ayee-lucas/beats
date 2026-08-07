@@ -19,3 +19,8 @@ axum = { version = "0.8.9" }
 connectrpc = { version = "0.8.1", features = ["axum", "client"] }
 async-trait = "0.1.91"
 http = '1.5.0'
+sea-orm = { version = "2.0.1", features = [
+  "sqlx-postgres",
+  "runtime-tokio",
+  "macros",
+] }

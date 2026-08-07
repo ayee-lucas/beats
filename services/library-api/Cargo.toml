@@ -24,3 +24,5 @@ sea-orm = { version = "2.0.1", features = [
   "runtime-tokio",
   "macros",
 ] }
+serde = "1.0.229"
+config = "0.15"

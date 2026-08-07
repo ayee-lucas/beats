@@ -21,7 +21,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .fallback_service(connect.into_axum_service());
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    eprintln!("library-server listening http://{} (Axum + Connect + gRPC + gRPC-Web)", addr);
+    eprintln!(
+        "library-server listening http://{} (Axum + Connect + gRPC + gRPC-Web)",
+        addr
+    );
     axum::serve(listener, app).await?;
     Ok(())
 }

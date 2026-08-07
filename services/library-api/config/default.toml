@@ -1,0 +1,11 @@
+# Safe defaults for local development. Committed to the repo.
+# Override per environment in config/{APP_ENV}.toml or via env vars:
+#   LIBRARY__DATABASE__URL=postgres://... cargo run -p library-server
+
+[server]
+host = "::1"
+port = 8080
+
+[database]
+url = "postgres://postgres:postgres@localhost:5432/library"
+run_migrations = true

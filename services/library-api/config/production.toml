@@ -1,0 +1,9 @@
+# Production overrides, loaded when APP_ENV=production.
+# Keep secrets OUT of this file — provide them via env vars instead:
+#   LIBRARY__DATABASE__URL
+
+[server]
+host = "::"
+
+[database]
+run_migrations = false

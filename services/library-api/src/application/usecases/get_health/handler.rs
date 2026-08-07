@@ -16,6 +16,12 @@ impl GetHealthHandler {
         Self { songs }
     }
 
+    /// Returns the health status for the library.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PingError::BackendUnavailable`] if the persistence backend
+    /// cannot be reached.
     pub async fn run(&self, name: String) -> Result<HealthOutcome, PingError> {
         self.songs.ping().await?;
 

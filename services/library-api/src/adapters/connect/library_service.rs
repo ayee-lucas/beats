@@ -23,7 +23,7 @@ impl LibraryService for ConnectLibraryService {
         request: ServiceRequest<'_, GetHealthRequest>,
     ) -> ServiceResult<GetHealthResponse> {
         let name = String::from(request.name);
-        let outcome = self.get_health.run(name).await.map_err(map_ping_error)?;
+        let outcome = self.get_health.run(name).await?;
 
         Response::ok(GetHealthResponse {
             status: outcome.message,
@@ -32,9 +32,12 @@ impl LibraryService for ConnectLibraryService {
     }
 }
 
-fn map_ping_error(err: crate::domain::repositories::PingError) -> ConnectError {
-    use crate::domain::repositories::PingError::*;
-    match err {
-        BackendUnavailable => ConnectError::unavailable("library persistence unavailable"),
+impl From<crate::domain::repositories::PingError> for ConnectError {
+    fn from(err: crate::domain::repositories::PingError) -> Self {
+        match err {
+            crate::domain::repositories::PingError::BackendUnavailable => {
+                ConnectError::unavailable(err.to_string())
+            }
+        }
     }
 }

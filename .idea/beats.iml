@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/proto-gen/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/services/library-api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/library-api/migration/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/crates/proto-gen/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>

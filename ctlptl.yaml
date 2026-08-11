@@ -1,0 +1,12 @@
+# Declarative local Kubernetes cluster for Tilt.
+# `ctlptl apply -f ctlptl.yaml` ensures the cluster and registry exist.
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: ctlptl-registry
+port: 5005
+---
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+name: kind-beats
+registry: ctlptl-registry

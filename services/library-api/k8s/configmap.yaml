@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: library-api-config
+data:
+  APP_ENV: "production"
+  LIBRARY__SERVER__HOST: "::"
+  LIBRARY__SERVER__PORT: "8080"
+  LIBRARY__DATABASE__RUN_MIGRATIONS: "false"

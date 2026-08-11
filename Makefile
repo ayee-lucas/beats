@@ -9,14 +9,19 @@
 #
 # After changing .proto files: `make proto`, commit crates/proto-gen/gen/, rebuild.
 
-.PHONY: proto help
+.PHONY: proto tilt help
 
 proto:
 	buf generate
 
+tilt:
+	ctlptl apply -f ctlptl.yaml
+	tilt up
+
 help:
 	@echo "Targets:"
 	@echo "  proto  Generate Rust from proto/ into crates/proto-gen/gen (buffa + connect-rust)"
+	@echo "  tilt   Start the local Kubernetes development environment (tilt up)"
 	@echo ""
 	@echo "Plugins (PATH): protoc-gen-buffa 0.8.1, protoc-gen-buffa-packaging 0.4.0,"
 	@echo "                protoc-gen-connect-rust 0.8.0 — match connectrpc/buffa 0.8.x crates"

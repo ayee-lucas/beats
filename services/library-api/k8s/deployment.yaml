@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: library-api
+  labels:
+    app: library-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: library-api
+  template:
+    metadata:
+      labels:
+        app: library-api
+    spec:
+      initContainers:
+        - name: migrate
+          image: library-api
+          imagePullPolicy: Never
+          command: ["/usr/local/bin/library-migration"]
+          envFrom:
+            - configMapRef:
+                name: library-api-config
+            - secretRef:
+                name: library-api-secret
+          env:
+            # SeaORM migration CLI reads DATABASE_URL by default.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: library-api-secret
+                  key: LIBRARY__DATABASE__URL
+      containers:
+        - name: library-api
+          image: library-api
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: library-api-config
+            - secretRef:
+                name: library-api-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10

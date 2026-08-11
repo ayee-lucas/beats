@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: beats
+
+resources:
+  - ../../base
+  - ../../../services/library-api/k8s
+
+# Production secrets should be injected by your secrets operator
+# (e.g. External Secrets Operator, Sealed Secrets, or SOPS).
+# Do NOT commit real credentials to this overlay.

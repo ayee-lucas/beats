@@ -15,7 +15,6 @@ pub struct ServerSettings {
 #[derive(Debug, Deserialize)]
 pub struct DatabaseSettings {
     pub url: String,
-    pub run_migrations: bool,
 }
 
 impl Settings {

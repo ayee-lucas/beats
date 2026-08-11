@@ -6,4 +6,3 @@
 host = "::"
 
 [database]
-run_migrations = false

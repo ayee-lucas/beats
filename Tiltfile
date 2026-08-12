@@ -36,6 +36,10 @@ service_objects = {
 # the overlay itself.
 k8s_yaml(kustomize('k8s/overlays/local'))
 
+# Ory Kratos is deployed via its upstream Helm chart (see k8s/helm/kratos-values.yaml).
+# Run `make helm-repo` once before `tilt up` so the chart is available locally.
+k8s_yaml(local('helm template kratos ory/kratos --namespace beats -f k8s/helm/kratos-values.yaml'))
+
 # ------------------------------------------------------------------------------
 # Per-service Docker builds
 # ------------------------------------------------------------------------------
@@ -83,6 +87,13 @@ k8s_resource(
     'postgres-init-dbs',
     labels=['infrastructure'],
     resource_deps=['postgres'],
+)
+
+k8s_resource(
+    'kratos',
+    port_forwards=['4433:4433', '4434:4434'],
+    labels=['infrastructure'],
+    resource_deps=['postgres', 'postgres-init-dbs'],
 )
 
 k8s_resource(

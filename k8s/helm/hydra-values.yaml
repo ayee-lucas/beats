@@ -1,0 +1,40 @@
+# Local development values for the Ory Hydra Helm chart.
+#
+# This is intentionally insecure: fixed secrets, dev mode, and placeholder
+# login/consent/logout URLs. Do NOT use these values in production.
+#
+# Install:
+#   make helm-repo
+#   tilt up
+#
+# Reference: https://github.com/ory/k8s/blob/master/docs/helm/hydra.md
+
+hydra:
+  # Enable dev mode for local HTTP testing. Not safe in production.
+  dev: true
+
+  # Runs hydra migrate sql automatically on install/upgrade.
+  automigration:
+    enabled: true
+
+  config:
+    # Reuses the shared Postgres deployed by k8s/base/postgres.
+    dsn: postgres://postgres:postgres@postgres:5432/hydra?sslmode=disable
+
+    # Insecure, deterministic secrets for local development only.
+    # Rotate these before deploying to any real environment.
+    secrets:
+      system:
+        - local-development-system-secret-do-not-use-in-production
+
+    # Placeholder URLs. A real login/consent app is not wired up locally yet.
+    urls:
+      self:
+        issuer: http://localhost:4444/
+      login: http://localhost:4455/login
+      consent: http://localhost:4455/consent
+      logout: http://localhost:4455/logout
+
+# Disable Hydra Maester for now to keep the local stack lean.
+maester:
+  enabled: false

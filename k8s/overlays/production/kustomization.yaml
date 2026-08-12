@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: beats
 
 resources:
+  - ../../base/namespace
   - ../../base
   - ../../base/kratos
   - ../../../services/library-api/k8s

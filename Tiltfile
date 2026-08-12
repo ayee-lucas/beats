@@ -31,14 +31,19 @@ service_objects = {
 # ------------------------------------------------------------------------------
 # Deploy the local environment
 # ------------------------------------------------------------------------------
-# The local overlay composes shared cluster resources (namespace, etc.) and all
-# service bases. Per-environment patches (replicas, resources, secrets) live in
-# the overlay itself.
+# Create the namespace first so Helm-rendered charts have a target namespace.
+k8s_yaml('k8s/base/namespace/namespace.yaml')
+
+# The local overlay composes shared cluster resources and all service bases.
+# Per-environment patches (replicas, resources, secrets) live in the overlay.
 k8s_yaml(kustomize('k8s/overlays/local'))
 
 # Ory Kratos is deployed via its upstream Helm chart (see k8s/helm/kratos-values.yaml).
 # Run `make helm-repo` once before `tilt up` so the chart is available locally.
 k8s_yaml(local('helm template kratos ory/kratos --namespace beats -f k8s/helm/kratos-values.yaml'))
+
+# Ory Hydra is deployed via its upstream Helm chart (see k8s/helm/hydra-values.yaml).
+k8s_yaml(local('helm template hydra ory/hydra --namespace beats -f k8s/helm/hydra-values.yaml'))
 
 # ------------------------------------------------------------------------------
 # Per-service Docker builds
@@ -65,8 +70,15 @@ for svc in services:
     k8s_resource(
         svc,
         port_forwards=service_ports[svc],
-        labels=[svc],
-        resource_deps=['postgres', 'postgres-init-dbs'],
+        labels=['services'],
+        resource_deps=[
+            'postgres',
+            'postgres-init-dbs',
+            'kratos',
+            'hydra',
+            'kratos-test-connection',
+            'hydra-test-connection',
+        ],
         objects=service_objects.get(svc, []),
     )
 
@@ -90,10 +102,67 @@ k8s_resource(
 )
 
 k8s_resource(
+    'kratos-automigrate',
+    labels=['infrastructure'],
+    resource_deps=['namespace', 'postgres', 'postgres-init-dbs'],
+)
+
+k8s_resource(
+    'hydra-automigrate',
+    labels=['infrastructure'],
+    resource_deps=['namespace', 'postgres', 'postgres-init-dbs'],
+)
+
+k8s_resource(
     'kratos',
     port_forwards=['4433:4433', '4434:4434'],
     labels=['infrastructure'],
-    resource_deps=['postgres', 'postgres-init-dbs'],
+    resource_deps=['namespace', 'postgres', 'postgres-init-dbs', 'kratos-automigrate'],
+    objects=[
+        'kratos:serviceaccount',
+        'kratos-cleanup:serviceaccount',
+        'kratos-job:serviceaccount',
+        'kratos-identity-schema:configmap',
+        'kratos-config:configmap',
+        'kratos-migrate:configmap',
+        'kratos:secret',
+    ],
+)
+
+k8s_resource(
+    'hydra',
+    port_forwards=['4444:4444', '4445:4445'],
+    labels=['infrastructure'],
+    resource_deps=['namespace', 'postgres', 'postgres-init-dbs', 'hydra-automigrate'],
+    objects=[
+        'hydra:serviceaccount',
+        'hydra-cronjob-janitor:serviceaccount',
+        'hydra-job:serviceaccount',
+        'hydra:configmap',
+        'hydra-migrate:configmap',
+        'hydra:secret',
+    ],
+)
+
+# Auto-created resources for Helm chart sub-components. Keep them grouped with
+# the main infrastructure resources. Migrations run first, then the main
+# deployments, then the courier/statefulset, and finally Helm test pods.
+k8s_resource(
+    'kratos-courier',
+    labels=['infrastructure'],
+    resource_deps=['kratos'],
+)
+
+k8s_resource(
+    'kratos-test-connection',
+    labels=['infrastructure'],
+    resource_deps=['kratos'],
+)
+
+k8s_resource(
+    'hydra-test-connection',
+    labels=['infrastructure'],
+    resource_deps=['hydra'],
 )
 
 k8s_resource(

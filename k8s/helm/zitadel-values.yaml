@@ -1,0 +1,51 @@
+# Local development values for the ZITADEL Helm chart.
+#
+# This is intentionally insecure: a fixed masterkey, plaintext database
+# credentials, and plaintext admin credentials. Do NOT use these values in
+# production.
+#
+# Install:
+#   make helm-repo
+#   tilt up
+#
+# Reference: https://zitadel.com/docs/self-hosting/deploy/kubernetes
+
+zitadel:
+  # Insecure, deterministic masterkey for local development only.
+  # Generate a real 32-byte key before deploying to any real environment.
+  masterkey: local-dev-masterkey-not-for-prod
+
+  configmapConfig:
+    # Use plain HTTP and localhost for local port-forward access.
+    ExternalDomain: localhost
+    ExternalPort: 8082
+    ExternalSecure: false
+
+    TLS:
+      Enabled: false
+
+    # Bootstrap a human admin user for the first ZITADEL instance.
+    FirstInstance:
+      Org:
+        Human:
+          UserName: admin
+          Email: admin@localhost
+          Password: Password1!
+          PasswordChangeRequired: false
+
+# Reuse the shared Postgres deployed by k8s/base/postgres.
+# Point ZITADEL at the maintenance database so it can create its own database
+# during initialization.
+env:
+  - name: ZITADEL_DATABASE_POSTGRES_DSN
+    value: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+
+# Disable the separate Login UI deployment; ZITADEL falls back to its built-in
+# login UI, which keeps the local stack lean and works through a single port.
+login:
+  enabled: false
+
+# Do not deploy the bundled PostgreSQL subchart; the local stack provides its
+# own Postgres instance.
+postgresql:
+  enabled: false

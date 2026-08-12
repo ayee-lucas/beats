@@ -6,7 +6,6 @@ namespace: beats
 resources:
   - ../../base/namespace
   - ../../base
-  - ../../base/kratos
   - ../../../services/library-api/k8s
   - ../../../services/profile-api/k8s
 

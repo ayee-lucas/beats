@@ -1,6 +1,8 @@
 # Tilt configuration for local Kubernetes development.
 # Usage: `tilt up` from the repository root.
 
+load('ext://helm_resource', 'helm_resource', 'helm_repo')
+
 # ------------------------------------------------------------------------------
 # Services
 # ------------------------------------------------------------------------------
@@ -38,12 +40,22 @@ k8s_yaml('k8s/base/namespace/namespace.yaml')
 # Per-environment patches (replicas, resources, secrets) live in the overlay.
 k8s_yaml(kustomize('k8s/overlays/local'))
 
-# Ory Kratos is deployed via its upstream Helm chart (see k8s/helm/kratos-values.yaml).
-# Run `make helm-repo` once before `tilt up` so the chart is available locally.
-k8s_yaml(local('helm template kratos ory/kratos --namespace beats -f k8s/helm/kratos-values.yaml'))
+# Register the ZITADEL Helm repository. The resource is referenced as
+# `zitadel-helm-repo` so it does not collide with the release resource below.
+helm_repo('zitadel-helm-repo', 'https://charts.zitadel.com', labels=['infrastructure'])
 
-# Ory Hydra is deployed via its upstream Helm chart (see k8s/helm/hydra-values.yaml).
-k8s_yaml(local('helm template hydra ory/hydra --namespace beats -f k8s/helm/hydra-values.yaml'))
+# ZITADEL is deployed via its upstream Helm chart (see k8s/helm/zitadel-values.yaml).
+# The helm_resource extension handles chart hooks (init/setup jobs) correctly.
+helm_resource(
+    'zitadel',
+    'zitadel/zitadel',
+    release_name='zitadel',
+    namespace='beats',
+    flags=['--values=k8s/helm/zitadel-values.yaml'],
+    resource_deps=['zitadel-helm-repo', 'namespace', 'postgres', 'postgres-init-dbs'],
+    labels=['infrastructure'],
+    port_forwards=['8082:8080'],
+)
 
 # ------------------------------------------------------------------------------
 # Per-service Docker builds
@@ -74,10 +86,7 @@ for svc in services:
         resource_deps=[
             'postgres',
             'postgres-init-dbs',
-            'kratos',
-            'hydra',
-            'kratos-test-connection',
-            'hydra-test-connection',
+            'zitadel',
         ],
         objects=service_objects.get(svc, []),
     )
@@ -101,69 +110,6 @@ k8s_resource(
     resource_deps=['postgres'],
 )
 
-k8s_resource(
-    'kratos-automigrate',
-    labels=['infrastructure'],
-    resource_deps=['namespace', 'postgres', 'postgres-init-dbs'],
-)
-
-k8s_resource(
-    'hydra-automigrate',
-    labels=['infrastructure'],
-    resource_deps=['namespace', 'postgres', 'postgres-init-dbs'],
-)
-
-k8s_resource(
-    'kratos',
-    port_forwards=['4433:4433', '4434:4434'],
-    labels=['infrastructure'],
-    resource_deps=['namespace', 'postgres', 'postgres-init-dbs', 'kratos-automigrate'],
-    objects=[
-        'kratos:serviceaccount',
-        'kratos-cleanup:serviceaccount',
-        'kratos-job:serviceaccount',
-        'kratos-identity-schema:configmap',
-        'kratos-config:configmap',
-        'kratos-migrate:configmap',
-        'kratos:secret',
-    ],
-)
-
-k8s_resource(
-    'hydra',
-    port_forwards=['4444:4444', '4445:4445'],
-    labels=['infrastructure'],
-    resource_deps=['namespace', 'postgres', 'postgres-init-dbs', 'hydra-automigrate'],
-    objects=[
-        'hydra:serviceaccount',
-        'hydra-cronjob-janitor:serviceaccount',
-        'hydra-job:serviceaccount',
-        'hydra:configmap',
-        'hydra-migrate:configmap',
-        'hydra:secret',
-    ],
-)
-
-# Auto-created resources for Helm chart sub-components. Keep them grouped with
-# the main infrastructure resources. Migrations run first, then the main
-# deployments, then the courier/statefulset, and finally Helm test pods.
-k8s_resource(
-    'kratos-courier',
-    labels=['infrastructure'],
-    resource_deps=['kratos'],
-)
-
-k8s_resource(
-    'kratos-test-connection',
-    labels=['infrastructure'],
-    resource_deps=['kratos'],
-)
-
-k8s_resource(
-    'hydra-test-connection',
-    labels=['infrastructure'],
-    resource_deps=['hydra'],
-)
 
 k8s_resource(
     objects=['beats:namespace'],

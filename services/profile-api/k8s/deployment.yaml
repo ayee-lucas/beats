@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: profile-api
+  labels:
+    app: profile-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: profile-api
+  template:
+    metadata:
+      labels:
+        app: profile-api
+    spec:
+      initContainers:
+        - name: migrate
+          image: profile-api
+          imagePullPolicy: Never
+          command: ["/usr/local/bin/profile-migration"]
+          envFrom:
+            - configMapRef:
+                name: profile-api-config
+            - secretRef:
+                name: profile-api-secret
+          env:
+            # SeaORM migration CLI reads DATABASE_URL by default.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: profile-api-secret
+                  key: PROFILE__DATABASE__URL
+      containers:
+        - name: profile-api
+          image: profile-api
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: profile-api-config
+            - secretRef:
+                name: profile-api-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10

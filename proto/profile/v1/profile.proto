@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package profile.v1;
+
+service ProfileService {
+    rpc GetHealth(GetHealthRequest) returns (GetHealthResponse);
+}
+
+message GetHealthRequest {
+    string name = 1;
+}
+
+message GetHealthResponse {
+  string status = 1;
+}

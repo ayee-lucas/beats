@@ -7,12 +7,13 @@
 # Add new services here as they are onboarded. Each service is expected to own
 # its base Kubernetes manifests under services/<name>/k8s/ and be referenced by
 # the local Kustomize overlay in k8s/overlays/local/kustomization.yaml.
-services = ['library-api']
+services = ['library-api', 'profile-api']
 
 # Local port-forward mapping per service. Use distinct host ports when adding
 # additional services.
 service_ports = {
     'library-api': '8080:8080',
+    'profile-api': '8081:8080',
 }
 
 # Supporting objects to group under each service resource in Tilt.
@@ -20,6 +21,10 @@ service_objects = {
     'library-api': [
         'library-api-config:configmap',
         'library-api-secret:secret',
+    ],
+    'profile-api': [
+        'profile-api-config:configmap',
+        'profile-api-secret:secret',
     ],
 }
 
@@ -43,7 +48,9 @@ for svc in services:
             'Cargo.toml',
             'Cargo.lock',
             'crates/',
-            'services/{}/'.format(svc),
+            # All workspace members must be present for cargo to load the
+            # virtual workspace, even when building a single service.
+            'services/',
         ],
         ignore=[
             'services/{}/target'.format(svc),
@@ -55,7 +62,7 @@ for svc in services:
         svc,
         port_forwards=service_ports[svc],
         labels=[svc],
-        resource_deps=['postgres'],
+        resource_deps=['postgres', 'postgres-init-dbs'],
         objects=service_objects.get(svc, []),
     )
 
@@ -70,6 +77,12 @@ k8s_resource(
     port_forwards='5432:5432',
     labels=['infrastructure'],
     resource_deps=['namespace'],
+)
+
+k8s_resource(
+    'postgres-init-dbs',
+    labels=['infrastructure'],
+    resource_deps=['postgres'],
 )
 
 k8s_resource(

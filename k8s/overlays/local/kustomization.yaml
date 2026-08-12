@@ -7,6 +7,7 @@ resources:
   - ../../base
   - ../../base/postgres
   - ../../../services/library-api/k8s
+  - ../../../services/profile-api/k8s
 
 # Generate the database credentials secret locally. Postgres is deployed as a
 # dependency by the ../../base/postgres base; point the API at the in-cluster
@@ -18,3 +19,6 @@ secretGenerator:
   - name: library-api-secret
     literals:
       - LIBRARY__DATABASE__URL=postgres://postgres:postgres@postgres:5432/library
+  - name: profile-api-secret
+    literals:
+      - PROFILE__DATABASE__URL=postgres://postgres:postgres@postgres:5432/profile

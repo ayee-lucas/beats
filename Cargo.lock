@@ -2172,6 +2172,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "profile-api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "config",
+ "connectrpc",
+ "http",
+ "proto-gen",
+ "sea-orm",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "profile-migration"
+version = "0.1.0"
+dependencies = [
+ "sea-orm-migration",
+ "tokio",
+]
+
+[[package]]
 name = "proto-gen"
 version = "0.1.0"
 dependencies = [

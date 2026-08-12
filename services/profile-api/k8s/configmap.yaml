@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: profile-api-config
+data:
+  APP_ENV: "production"
+  PROFILE__SERVER__HOST: "::"
+  PROFILE__SERVER__PORT: "8080"
+  PROFILE__DATABASE__RUN_MIGRATIONS: "false"

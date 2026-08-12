@@ -6,6 +6,7 @@ namespace: beats
 resources:
   - ../../base
   - ../../../services/library-api/k8s
+  - ../../../services/profile-api/k8s
 
 # Production secrets should be injected by your secrets operator
 # (e.g. External Secrets Operator, Sealed Secrets, or SOPS).

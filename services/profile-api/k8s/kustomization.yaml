@@ -3,15 +3,12 @@ kind: Kustomization
 
 resources:
   - configmap.yaml
-  - secret.yaml
-  - pvc.yaml
   - deployment.yaml
   - service.yaml
-  - init-job.yaml
 
 labels:
   - includeSelectors: true
     includeTemplates: true
     pairs:
-      app.kubernetes.io/name: postgres
+      app.kubernetes.io/name: profile-api
       app.kubernetes.io/part-of: beats

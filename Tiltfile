@@ -3,6 +3,14 @@
 
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
 
+# Ensure the kind cluster and its local image registry are reconciled before
+# service images are built and deployed.
+local_resource(
+    'local-cluster',
+    'sh scripts/dev/ensure-local-cluster.sh',
+    labels=['infrastructure'],
+)
+
 # ------------------------------------------------------------------------------
 # Services
 # ------------------------------------------------------------------------------
@@ -52,7 +60,13 @@ helm_resource(
     release_name='zitadel',
     namespace='beats',
     flags=['--values=k8s/helm/zitadel-values.yaml'],
-    resource_deps=['zitadel-helm-repo', 'namespace', 'postgres', 'postgres-init-dbs'],
+    resource_deps=[
+        'local-cluster',
+        'zitadel-helm-repo',
+        'namespace',
+        'postgres',
+        'postgres-init-dbs',
+    ],
     labels=['infrastructure'],
     port_forwards=['8082:8080'],
 )
@@ -84,6 +98,7 @@ for svc in services:
         port_forwards=service_ports[svc],
         labels=['services'],
         resource_deps=[
+            'local-cluster',
             'postgres',
             'postgres-init-dbs',
             'zitadel',
@@ -101,13 +116,13 @@ k8s_resource(
     ],
     port_forwards='5432:5432',
     labels=['infrastructure'],
-    resource_deps=['namespace'],
+    resource_deps=['local-cluster', 'namespace'],
 )
 
 k8s_resource(
     'postgres-init-dbs',
     labels=['infrastructure'],
-    resource_deps=['postgres'],
+    resource_deps=['local-cluster', 'postgres'],
 )
 
 
@@ -115,4 +130,5 @@ k8s_resource(
     objects=['beats:namespace'],
     new_name='namespace',
     labels=['infrastructure'],
+    resource_deps=['local-cluster'],
 )

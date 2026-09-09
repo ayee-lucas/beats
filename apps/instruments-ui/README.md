@@ -6,7 +6,7 @@ This guide explains how to use a React design system starter powered by:
 
 - 🏎 [Turborepo](https://turborepo.dev) — High-performance build system for Monorepos
 - 🚀 [React](https://reactjs.org/) — JavaScript library for user interfaces
-- 🛠 [Tsup](https://github.com/egoist/tsup) — TypeScript bundler powered by esbuild
+- 🛠 [tsdown](https://tsdown.dev/) — TypeScript bundler powered by Rolldown
 - 📖 [Storybook](https://storybook.js.org/) — UI component environment powered by Vite
 
 As well as a few others tools preconfigured:
@@ -54,17 +54,17 @@ This example sets up your `.gitignore` to exclude all generated files, other fol
 
 ### Compilation
 
-To make the ui library code work across all browsers, we need to compile the raw TypeScript and React code to plain JavaScript. We can accomplish this with `tsup`, which uses `esbuild` to greatly improve performance.
+The UI library uses `tsdown`, powered by Rolldown, to compile TypeScript and React code to JavaScript. Building requires Node.js 22.18+, 24.11+, or 26+ (see `engines.node` in the root `package.json`).
 
 Running `pnpm build` from the root of the Turborepo will run the `build` command defined in each package's `package.json` file. Turborepo runs each `build` in parallel and caches & hashes the output to speed up future builds.
 
-For `@acme/ui`, the `build` command is equivalent to the following:
+For `@acme/ui`, the `build` command uses `packages/ui/tsdown.config.mts`:
 
 ```bash
-tsup src/*.tsx --format esm,cjs --dts --external react
+pnpm --filter @acme/ui build
 ```
 
-`tsup` compiles all of the components in the design system individually, into both ES Modules and CommonJS formats as well as their TypeScript types. The `package.json` for `@acme/ui` then instructs the consumer to select the correct format:
+`tsdown` compiles the configured component entries into both ES Modules and CommonJS formats as well as their TypeScript types, keeping React external. The `package.json` for `@acme/ui` then instructs the consumer to select the correct format:
 
 ```json:ui/package.json
 {

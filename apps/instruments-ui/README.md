@@ -58,17 +58,17 @@ The UI library uses `tsdown`, powered by Rolldown, to compile TypeScript and Rea
 
 Running `pnpm build` from the root of the Turborepo will run the `build` command defined in each package's `package.json` file. Turborepo runs each `build` in parallel and caches & hashes the output to speed up future builds.
 
-For `@acme/ui`, the `build` command uses `packages/ui/tsdown.config.mts`:
+For `@instruments/ui`, the `build` command uses `packages/ui/tsdown.config.mts`:
 
 ```bash
-pnpm --filter @acme/ui build
+pnpm --filter @instruments/ui build
 ```
 
-`tsdown` compiles the configured component entries into both ES Modules and CommonJS formats as well as their TypeScript types, keeping React external. The `package.json` for `@acme/ui` then instructs the consumer to select the correct format:
+`tsdown` compiles the configured component entries into both ES Modules and CommonJS formats as well as their TypeScript types, keeping React external. The `package.json` for `@instruments/ui` then instructs the consumer to select the correct format:
 
 ```json:ui/package.json
 {
-  "name": "@acme/ui",
+  "name": "@instruments/ui",
   "version": "0.0.0",
   "sideEffects": false,
   "exports":{
@@ -92,6 +92,18 @@ ui
     └── button.d.mts   <-- ES Modules version with Types
 ```
 
+### Tailwind CSS
+
+The UI package uses Tailwind CSS v4. Add complete utility class names to components in `packages/ui/src`; `src/styles.css` scopes class detection to that directory. Customize the theme there with Tailwind's `@theme` directive.
+
+`pnpm build` generates `packages/ui/dist/styles.css` alongside the JavaScript bundles. `pnpm dev` watches both component code and styles. Consumers should import the compiled stylesheet once in their app entry point:
+
+```ts
+import "@instruments/ui/styles.css";
+```
+
+Storybook loads this stylesheet in `.storybook/preview.ts`. It includes Tailwind's Preflight reset. Consumers do not need Tailwind installed to use the compiled styles; utility classes used only in a consuming app need that app's own Tailwind setup.
+
 ## Components
 
 Each file inside of `ui/src` is a component inside our design system. For example:
@@ -114,7 +126,7 @@ When adding a new file, ensure that its specifier is defined in `package.json` f
 
 ```json:ui/package.json
 {
-  "name": "@acme/ui",
+  "name": "@instruments/ui",
   "version": "0.0.0",
   "sideEffects": false,
   "exports":{
@@ -134,13 +146,13 @@ Storybook provides us with an interactive UI playground for our components. This
 
 - Use Vite to bundle stories instantly (in milliseconds)
 - Automatically find any stories inside the `stories/` folder
-- Support using module path aliases like `@acme/ui` for imports
+- Support using module path aliases like `@instruments/ui` for imports
 - Write MDX for component documentation pages
 
 For example, here's the included Story for our `Button` component:
 
 ```js:apps/docs/stories/button.stories.mdx
-import { Button } from '@acme/ui/button';
+import { Button } from '@instruments/ui/button';
 import { Meta, Story, Preview, Props } from '@storybook/addon-docs/blocks';
 
 <Meta title="Components/Button" component={Button} />
@@ -190,14 +202,10 @@ To generate your changelog, run `pnpm changeset` locally:
 When you push your code to GitHub, the [GitHub Action](https://github.com/changesets/action) will run the `release` script defined in the root `package.json`:
 
 ```bash
-turbo run build --filter=docs^... && changeset publish
+turbo run build --filter=@instruments/docs^... && changeset publish
 ```
 
-Turborepo runs the `build` script for all publishable packages (excluding docs) and publishes the packages to npm. By default, this example includes `acme` as the npm organization. To change this, do the following:
-
-- Rename folders in `packages/*` to replace `acme` with your desired scope
-- Search and replace `acme` with your desired scope
-- Re-run `pnpm install`
+Turborepo builds the dependencies of `@instruments/docs` and publishes eligible packages to npm. Workspace apps and packages use the `@instruments` scope.
 
 To publish packages to a private npm organization scope, **remove** the following from each of the `package.json`'s
 

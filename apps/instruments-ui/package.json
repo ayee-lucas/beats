@@ -11,7 +11,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build --filter=docs^... && changeset publish",
+    "release": "turbo run build --filter=@instruments/docs^... && changeset publish",
     "preview-storybook": "turbo run preview-storybook"
   },
   "devDependencies": {
@@ -20,5 +20,5 @@
     "turbo": "^2.10.12"
   },
   "packageManager": "pnpm@8.15.6",
-  "name": "design-system"
+  "name": "@instruments/instruments-ui"
 }

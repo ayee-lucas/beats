@@ -5,6 +5,7 @@ members = [
   "services/library-api/migration",
   "services/profile-api",
   "services/profile-api/migration",
+  "apps/client/src-tauri",
 ]
 resolver = "2"
 

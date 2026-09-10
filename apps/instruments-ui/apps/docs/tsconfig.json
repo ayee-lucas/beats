@@ -1,6 +1,6 @@
 {
   "extends": "@instruments/typescript-config/react-app.json",
-  "include": ["."],
+  "include": [".", ".storybook/**/*.tsx"],
   "exclude": ["dist", "build", "node_modules"],
   "compilerOptions": {
     "strictNullChecks": true

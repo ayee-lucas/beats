@@ -1,0 +1,12 @@
+/* Figma Record / signal label (113:19): a 172 × 172 ellipse. */
+@layer components {
+  .beats-record-signal-label {
+    display: inline-block;
+    flex-shrink: 0;
+    aspect-ratio: 1;
+    max-width: 100%;
+    border-radius: 50%;
+    background-color: var(--beats-accent-primary);
+    vertical-align: middle;
+  }
+}

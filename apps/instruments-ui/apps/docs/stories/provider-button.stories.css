@@ -1,0 +1,10 @@
+.beats-provider-preview {
+  width: 100%;
+  max-width: 464px;
+}
+
+.beats-provider-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

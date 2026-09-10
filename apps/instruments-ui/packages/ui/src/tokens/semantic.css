@@ -1,0 +1,25 @@
+/* Resolve semantic aliases on the element using the Tailwind utility. */
+@theme inline {
+  --color-bg-canvas: var(--beats-bg-canvas);
+  --color-bg-surface: var(--beats-bg-surface);
+  --color-bg-surface-subtle: var(--beats-bg-surface-subtle);
+  --color-bg-angled-panel: var(--beats-bg-angled-panel);
+  --color-text-primary: var(--beats-text-primary);
+  --color-text-secondary: var(--beats-text-secondary);
+  --color-text-inverse: var(--beats-text-inverse);
+  --color-text-on-accent: var(--beats-text-on-accent);
+  --color-text-on-accent-subdued: var(--beats-text-on-accent-subdued);
+  --color-text-on-danger: var(--beats-text-on-danger);
+  --color-border-default: var(--beats-border-default);
+  --color-accent-primary: var(--beats-accent-primary);
+  --color-accent-secondary: var(--beats-accent-secondary);
+  --color-interactive-default: var(--beats-interactive-default);
+  --color-interactive-selected: var(--beats-interactive-selected);
+  --color-focus: var(--beats-focus);
+  --color-shadow-hard: var(--beats-shadow-hard);
+  --color-shadow-subtle: var(--beats-shadow-subtle);
+  --color-danger-primary: var(--beats-danger-primary);
+  --color-danger-hover: var(--beats-danger-hover);
+  --color-danger-pressed: var(--beats-danger-pressed);
+}
+

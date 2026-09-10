@@ -1,0 +1,95 @@
+@font-face {
+  font-family: "FOT-Rodin Pro";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("./fonts/rodin-l.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-Rodin Pro";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/rodin-m.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-Rodin Pro";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/rodin-db.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-Rodin Pro";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/rodin-b.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-Rodin Pro";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("./fonts/rodin-eb.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-Rodin Pro";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("./fonts/rodin-ub.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-NewRodin Pro";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("./fonts/newrodin-l.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-NewRodin Pro";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/newrodin-m.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-NewRodin Pro";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/newrodin-db.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-NewRodin Pro";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/newrodin-b.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-NewRodin Pro";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("./fonts/newrodin-eb.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "FOT-NewRodin Pro";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("./fonts/newrodin-ub.otf") format("opentype");
+}

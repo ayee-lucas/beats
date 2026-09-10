@@ -11,15 +11,36 @@
       "types": "./src/button.tsx",
       "import": "./dist/button.mjs",
       "require": "./dist/button.js"
+    },
+    "./provider-button": {
+      "types": "./src/provider-button.tsx",
+      "import": "./dist/provider-button.mjs",
+      "require": "./dist/provider-button.js"
+    },
+    "./typography": {
+      "types": "./src/typography.tsx",
+      "import": "./dist/typography.mjs",
+      "require": "./dist/typography.js"
+    },
+    "./artwork/record-signal-label": {
+      "types": "./src/record-signal-label.tsx",
+      "import": "./dist/record-signal-label.mjs",
+      "require": "./dist/record-signal-label.js"
+    },
+    "./artwork/record": {
+      "types": "./src/record.tsx",
+      "import": "./dist/record.mjs",
+      "require": "./dist/record.js"
     }
   },
   "scripts": {
     "build": "tsdown && pnpm build:css",
-    "build:css": "tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
+    "build:css": "node scripts/copy-fonts.mjs && tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
     "dev": "pnpm build && concurrently --kill-others \"tsdown --watch --no-clean\" \"pnpm dev:css\"",
-    "dev:css": "tailwindcss -i ./src/styles.css -o ./dist/styles.css --watch",
+    "dev:css": "node scripts/copy-fonts.mjs && tailwindcss -i ./src/styles.css -o ./dist/styles.css --watch",
     "lint": "eslint . --max-warnings 0",
-    "clean": "rm -rf .turbo node_modules dist"
+    "clean": "rm -rf .turbo node_modules dist",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@instruments/eslint-config": "workspace:*",

@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/button.tsx"],
+  entry: ["src/button.tsx", "src/provider-button.tsx", "src/typography.tsx", "src/record-signal-label.tsx", "src/record.tsx"],
   format: ["cjs", "esm"],
   dts: true,
   deps: { neverBundle: [/^react(?:\/|$)/] },

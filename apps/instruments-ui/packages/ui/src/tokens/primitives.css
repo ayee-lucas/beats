@@ -1,0 +1,21 @@
+/* Figma: Beats / Primitives and Beats / Color
+ * https://www.figma.com/design/U73mRK5HOxNoenapKNxCAc/beats?node-id=136-221
+ * Dark is the collection default. Use .light/.dark or data-theme on a
+ * container to switch semantic colors, including nested themes.
+ */
+@theme static {
+  --color-soft-white: #e6e6e8;
+  --color-silver-gray: #aaaab2;
+  --color-graphite: #62626b;
+  --color-gunmetal: #38383f;
+  --color-deep-charcoal: #202024;
+  --color-film-black: #101012;
+  --color-signal-magenta: #e247f1;
+  --color-deep-magenta: #752a7d;
+  --color-steel-gray: #85858e;
+  --color-danger-coral: #ff777f;
+  --color-danger-red: #b42336;
+  --color-danger-pale: #ffa0a5;
+  --color-danger-deep: #8f1c2b;
+}
+

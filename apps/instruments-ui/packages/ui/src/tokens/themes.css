@@ -1,0 +1,52 @@
+/* Mode values stay scoped to the nearest theme container. */
+:root,
+.dark,
+[data-theme="dark"] {
+  --beats-bg-canvas: var(--color-film-black);
+  --beats-bg-surface: var(--color-deep-charcoal);
+  --beats-bg-surface-subtle: var(--color-gunmetal);
+  --beats-bg-angled-panel: var(--color-deep-charcoal);
+  --beats-text-primary: var(--color-soft-white);
+  --beats-text-secondary: var(--color-silver-gray);
+  --beats-text-inverse: var(--color-film-black);
+  --beats-text-on-accent: var(--color-film-black);
+  --beats-text-on-accent-subdued: var(--color-soft-white);
+  --beats-text-on-danger: var(--color-film-black);
+  --beats-border-default: var(--color-graphite);
+  --beats-accent-primary: var(--color-signal-magenta);
+  --beats-accent-secondary: var(--color-deep-magenta);
+  --beats-interactive-default: var(--color-gunmetal);
+  --beats-interactive-selected: var(--color-signal-magenta);
+  --beats-focus: var(--color-signal-magenta);
+  --beats-shadow-hard: rgb(170 170 178 / 40%);
+  --beats-shadow-subtle: rgb(170 170 178 / 24%);
+  --beats-danger-primary: var(--color-danger-coral);
+  --beats-danger-hover: var(--color-danger-pale);
+  --beats-danger-pressed: var(--color-danger-red);
+}
+
+.light,
+[data-theme="light"] {
+  --beats-bg-canvas: var(--color-soft-white);
+  --beats-bg-surface: var(--color-soft-white);
+  --beats-bg-surface-subtle: var(--color-silver-gray);
+  --beats-bg-angled-panel: var(--color-silver-gray);
+  --beats-text-primary: var(--color-deep-charcoal);
+  --beats-text-secondary: var(--color-gunmetal);
+  --beats-text-inverse: var(--color-soft-white);
+  --beats-text-on-accent: var(--color-film-black);
+  --beats-text-on-accent-subdued: var(--color-soft-white);
+  --beats-text-on-danger: var(--color-soft-white);
+  --beats-border-default: var(--color-graphite);
+  --beats-accent-primary: var(--color-signal-magenta);
+  --beats-accent-secondary: var(--color-deep-magenta);
+  --beats-interactive-default: var(--color-gunmetal);
+  --beats-interactive-selected: var(--color-film-black);
+  --beats-focus: var(--color-deep-magenta);
+  --beats-shadow-hard: rgb(12 13 14 / 38%);
+  --beats-shadow-subtle: rgb(12 13 14 / 18%);
+  --beats-danger-primary: var(--color-danger-red);
+  --beats-danger-hover: var(--color-danger-deep);
+  --beats-danger-pressed: var(--color-danger-deep);
+}
+

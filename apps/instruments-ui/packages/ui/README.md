@@ -2,63 +2,59 @@
 
 ## Usage
 
-Import the compiled stylesheet once in your application entry point. JavaScript
-entry points do not import CSS, so consumers control when global styles load.
+Import the shared theme once at the application entry point. Each component
+imports its own compiled CSS automatically.
 
 ```tsx
-import "@instruments/ui/styles.css";
-import { Button, type ButtonVariant } from "@instruments/ui/button";
+import "@instruments/ui/theme.css";
+import { Button } from "@instruments/ui/button";
 
 <Button variant="secondary">Continue</Button>;
 ```
 
-The stylesheet includes Tailwind's reset and package utilities. Avoid importing it
-multiple times or processing the package's component CSS independently.
+`styles.css` remains a compatibility alias for the shared theme only. It no
+longer collects component styles. Consumers need a bundler that handles CSS
+imports, such as Vite; direct Node execution of the component bundles does not
+load CSS.
 
 ## Structure
 
-- `src/button.tsx`: public entry point; keeps `@instruments/ui/button` stable.
-- `src/components/button/`: implementation and colocated component styles.
-- `src/tokens/primitives.css`: Figma palette values.
-- `src/tokens/semantic.css`: semantic Tailwind color aliases.
-- `src/tokens/themes.css`: light/dark values for those aliases.
-- `src/tokens/typography.css`: shared font configuration.
-- `src/styles.css`: CSS entry point and explicit import order.
+- `src/theme.css`: Tailwind reset, font faces, and shared tokens only.
+- `src/tokens/`: primitive colors, semantic aliases, theme values and type tokens.
+- `src/components/<name>/`: component TSX and focused CSS.
+- `src/artwork/<name>/`: decorative brand artwork TSX and CSS.
+- Public `src/*.tsx` entry points keep package imports stable.
 
-Component rules belong in `@layer components`, use the `beats-` class prefix, and
-consume semantic colors. Tailwind utilities passed through `className` can then
-override component defaults. Use native interaction selectors for hover, active,
-focus-visible, and disabled states. Keep story layout rules in the docs app.
+Use stable class names in TSX. Write Tailwind utilities with `@apply` in each
+component stylesheet, under `@layer components`. Start each stylesheet with
+`@reference "../../theme.css"` to access tokens without emitting another reset
+or font definitions. Keep exact artwork geometry in plain CSS where necessary.
+
+## Adding a component
+
+1. Add its TSX and CSS together in `src/components/<name>/` or `src/artwork/<name>/`.
+2. Import `./<name>.css` from the implementation. No shared CSS import list needs
+   updating: the CSS build discovers component and artwork styles recursively.
+3. Add a public re-export, tsdown entry and package export following `./button`.
+4. Add a Storybook story. Its theme comes from the shared toolbar; story-only
+   layout styles belong beside the story in the docs app.
+5. Run the package build, typecheck and lint, then build Storybook.
+
+The CSS build preserves source-relative paths under `dist`. The tsdown plugin
+preserves matching CSS imports in ESM and CJS bundles, including shared chunks.
+The package marks CSS as side-effectful so consumer bundlers retain it.
+
+Run the UI package's `dev` script alongside Storybook. JavaScript and CSS watch
+processes update `dist`. The CSS watcher rebuilds on CSS/TS/TSX changes, including
+new component styles and shared token edits. Restart the build after adding or
+replacing font assets.
 
 ## Themes
 
 Dark is the default. Set `data-theme="light"` or `data-theme="dark"` on a container;
 `.light` and `.dark` also work. Nested containers can select their own theme.
-Semantic Tailwind aliases use `@theme inline` so utilities resolve colors on the
-styled element rather than capturing the root theme.
-
-```tsx
-<div data-theme="light">
-  <Button>Continue</Button>
-</div>
-```
-
-Storybook's Theme toolbar applies the same container contract. A host application
-should apply its theme to portal containers too when rendering outside that tree.
-
-## Adding a component
-
-1. Add `src/components/<name>/<name>.tsx` and `<name>.css`.
-2. Import the CSS from `src/styles.css` after the token imports.
-3. Add a public `src/<name>.tsx` re-export, a tsdown entry, and a matching package
-   export following `./button`.
-4. Add a story in `apps/docs/stories`; use the shared preview for theme and layout.
-5. Run the UI package's `build`, `typecheck`, and `lint` scripts, and build the
-   docs app to verify consumption through the public package exports.
-
-Run the UI package's `dev` script alongside Storybook when editing components.
-It watches the JavaScript entries and CSS imports and updates `dist`, which is
-what Storybook and other consumers import. No additional CSS loader is required.
+Semantic aliases use `@theme inline` to resolve colors on the styled element.
+Apply the theme to portal containers too when they render outside that tree.
 
 ## Assets
 

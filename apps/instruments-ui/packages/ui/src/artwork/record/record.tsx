@@ -1,3 +1,4 @@
+import "./record.css";
 import type { CSSProperties } from "react";
 import { RecordSignalLabel } from "../record-signal-label/record-signal-label";
 

@@ -1,3 +1,4 @@
+import "./record-signal-label.css";
 import type { CSSProperties } from "react";
 
 export interface RecordSignalLabelProps {

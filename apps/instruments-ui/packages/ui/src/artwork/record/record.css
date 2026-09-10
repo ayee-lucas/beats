@@ -1,38 +1,27 @@
+@reference "../../theme.css";
+
 /* Geometry and text positions match the 540px Figma artwork.
    Container units keep text and 1px strokes proportional when resized. */
 @layer components {
   .beats-record-artwork {
     container-type: inline-size;
-    max-width: 100%;
-    aspect-ratio: 1;
-    flex-shrink: 0;
+    @apply max-w-full aspect-square shrink-0;
   }
 
   .beats-record-artwork-disc {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: var(--beats-bg-surface);
+    @apply relative w-full aspect-square rounded-full bg-bg-surface;
     box-shadow: inset 0 0 0 0.185185cqw var(--beats-border-default);
   }
 
   .beats-record-artwork-grooves {
-    position: absolute;
-    inset: 0;
-    opacity: 0.5;
+    @apply absolute inset-0 opacity-50;
   }
 
   .beats-record-artwork-groove,
   .beats-record-artwork-label,
   .beats-record-artwork-spindle,
   .beats-record-artwork-keyline {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    aspect-ratio: 1;
-    border-radius: 50%;
+    @apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 aspect-square rounded-full;
   }
 
   .beats-record-artwork-groove {
@@ -43,7 +32,7 @@
 
   .beats-record-artwork-spindle {
     width: 2.962963%;
-    background: var(--beats-bg-canvas);
+    @apply bg-bg-canvas;
   }
 
   .beats-record-artwork-keyline {
@@ -53,13 +42,10 @@
 
   .beats-record-artwork-title,
   .beats-record-artwork-side {
-    position: absolute;
-    font-family: var(--font-newrodin);
-    font-weight: 600;
+    @apply absolute font-newrodin font-semibold whitespace-nowrap text-text-on-accent;
     line-height: normal;
     letter-spacing: 0;
-    white-space: nowrap;
-    color: var(--beats-text-on-accent);
+
   }
 
   .beats-record-artwork-title {

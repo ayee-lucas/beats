@@ -1,0 +1,8 @@
+/* Shared reset, fonts and tokens. Import once in the host application. */
+@import "tailwindcss" source(".");
+@import "./fonts.css";
+@import "./tokens/primitives.css";
+@import "./tokens/semantic.css";
+@import "./tokens/typography.css";
+@import "./tokens/radius.css";
+@import "./tokens/themes.css";

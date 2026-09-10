@@ -6,7 +6,7 @@
   ],
   "license": "MIT",
   "exports": {
-    "./styles.css": "./dist/styles.css",
+    "./styles.css": "./dist/theme.css",
     "./button": {
       "types": "./src/button.tsx",
       "import": "./dist/button.mjs",
@@ -31,13 +31,14 @@
       "types": "./src/record.tsx",
       "import": "./dist/record.mjs",
       "require": "./dist/record.js"
-    }
+    },
+    "./theme.css": "./dist/theme.css"
   },
   "scripts": {
     "build": "tsdown && pnpm build:css",
-    "build:css": "node scripts/copy-fonts.mjs && tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
+    "build:css": "node scripts/build-css.mjs",
     "dev": "pnpm build && concurrently --kill-others \"tsdown --watch --no-clean\" \"pnpm dev:css\"",
-    "dev:css": "node scripts/copy-fonts.mjs && tailwindcss -i ./src/styles.css -o ./dist/styles.css --watch",
+    "dev:css": "node scripts/build-css.mjs --watch",
     "lint": "eslint . --max-warnings 0",
     "clean": "rm -rf .turbo node_modules dist",
     "typecheck": "tsc --noEmit"

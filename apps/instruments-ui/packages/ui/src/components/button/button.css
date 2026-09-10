@@ -1,8 +1,8 @@
+@reference "../../theme.css";
+
 @layer components {
   .beats-button {
-    @apply inline-flex h-12 shrink-0 items-center justify-center gap-4 rounded-none border-0 px-6 py-3 text-sm leading-[22px] font-medium tracking-[0.84px] whitespace-nowrap uppercase;
-    font-family: var(--font-sans);
-    cursor: pointer;
+    @apply inline-flex h-12 shrink-0 items-center justify-center gap-4 rounded-none border-0 px-6 py-3 text-control font-medium tracking-control whitespace-nowrap uppercase font-sans cursor-pointer;
   }
 
   .beats-button[data-variant="primary"] {
@@ -60,7 +60,7 @@
 
   .beats-button:disabled {
     @apply text-text-secondary opacity-45;
-    cursor: not-allowed;
+    @apply cursor-not-allowed;
   }
 
   .beats-button:is([data-variant="primary"], [data-variant="destructive"]):disabled {
@@ -69,7 +69,7 @@
 
   .beats-button-signal {
     @apply block h-4 w-2.5 shrink-0;
-    background-color: currentColor;
+    @apply bg-current;
     /* Exact Figma export. Replace with a local asset before publishing;
        the temporary Figma MCP asset URL expires after approximately 7 days. */
     mask: url("https://www.figma.com/api/mcp/asset/9b5ecfb5-cbf0-4ae6-8cda-de69af68f3f3.svg") center / 100% 100% no-repeat;
